@@ -1,0 +1,20 @@
+{
+  "name": "BBScoring — 棒球計分助手",
+  "short_name": "BBScoring",
+  "description": "離線可用的棒球計分 PWA 應用程式",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#1a5276",
+  "background_color": "#0d1b2a",
+  "lang": "zh-TW",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚾</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["sports", "utilities"]
+}

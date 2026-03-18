@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="BBScoring — 棒球計分助手，離線可用的 PWA">
+  <meta name="theme-color" content="#1a5276">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BBScoring">
+
+  <title>BBScoring — 棒球計分助手</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚾</text></svg>">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/field.css">
+  <link rel="stylesheet" href="css/scoreboard.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <!-- 主應用程式容器 -->
+  <div id="app"></div>
+
+  <!-- Toast 容器 -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- 確認對話框 -->
+  <div id="confirm-dialog" class="modal" role="dialog" aria-modal="true" style="display:none;">
+    <div class="modal__content">
+      <div class="modal__body">
+        <p id="confirm-message"></p>
+      </div>
+      <div class="modal__footer">
+        <button id="confirm-cancel" class="btn btn--outline">取消</button>
+        <button id="confirm-ok" class="btn btn--primary">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS 入口 (ES Module) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

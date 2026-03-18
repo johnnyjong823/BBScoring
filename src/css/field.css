@@ -1,0 +1,214 @@
+/* ====================================
+   BBScoring - Field Diagram
+   ==================================== */
+
+.field-diagram {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.field-diagram svg {
+  width: 100%;
+  height: auto;
+}
+
+/* 球場區域 */
+.field-zone {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+  cursor: pointer;
+  transition: fill var(--transition-fast);
+}
+
+.field-zone:hover,
+.field-zone:active {
+  fill: rgba(41, 128, 185, 0.3);
+}
+
+.field-zone.selected {
+  fill: rgba(41, 128, 185, 0.5);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+/* 球場底色 */
+.field-grass {
+  fill: #1a472a;
+}
+
+.field-dirt {
+  fill: #5d4e37;
+}
+
+[data-theme="light"] .field-grass {
+  fill: #4caf50;
+}
+
+[data-theme="light"] .field-dirt {
+  fill: #a67c52;
+}
+
+/* 守備位置標示 */
+.field-position {
+  cursor: pointer;
+}
+
+.field-position circle {
+  fill: var(--bg-card);
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  transition: fill var(--transition-fast);
+}
+
+.field-position:hover circle,
+.field-position.selected circle {
+  fill: var(--color-primary-light);
+  stroke: #fff;
+}
+
+.field-position text {
+  fill: var(--text-primary);
+  font-size: 11px;
+  font-family: var(--font-number);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+/* 壘包圖 */
+.runner-diagram {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  margin: 0 auto;
+}
+
+.runner-diagram__svg {
+  width: 100%;
+  height: 100%;
+}
+
+rect.base {
+  fill: var(--bg-input, #2c3e50);
+  stroke: var(--text-muted, #7f8c8d);
+  stroke-width: 2;
+  /* Reset HTML .base CSS that overrides SVG sizing */
+  position: static;
+  display: inline;
+  width: auto;
+  height: auto;
+}
+
+rect.base.occupied {
+  fill: var(--color-primary-light, #2980b9);
+  stroke: var(--color-primary-light, #2980b9);
+}
+
+circle.runner-dot {
+  fill: var(--color-warning, #f39c12);
+}
+
+circle.out-dot {
+  fill: transparent;
+  stroke: var(--text-muted, #7f8c8d);
+  stroke-width: 1.5;
+}
+
+circle.out-dot.filled {
+  fill: var(--color-warning, #f39c12);
+  stroke: var(--color-warning, #f39c12);
+}
+
+.base {
+  position: absolute;
+  width: var(--touch-base);
+  height: var(--touch-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.base__diamond {
+  width: 36px;
+  height: 36px;
+  background-color: var(--bg-input);
+  border: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: all var(--transition-fast);
+}
+
+.base.occupied .base__diamond {
+  background-color: var(--color-primary-light);
+  border-color: var(--color-primary-light);
+  box-shadow: 0 0 10px rgba(41, 128, 185, 0.5);
+}
+
+.base__label {
+  position: absolute;
+  font-family: var(--font-number);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.base__runner {
+  position: absolute;
+  font-family: var(--font-number);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  color: #fff;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 壘包定位 */
+.base--home {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.base--first {
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.base--second {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.base--third {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* 壘包連線 */
+.runner-diagram__lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.runner-diagram__lines svg {
+  width: 100%;
+  height: 100%;
+}
+
+.runner-diagram__lines line {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+}

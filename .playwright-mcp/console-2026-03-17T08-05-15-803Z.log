@@ -1,0 +1,6 @@
+[    3023ms] TypeError: Cannot read properties of undefined (reading 'balls')
+    at LiveRecord._renderCountDisplay (http://localhost:8080/js/ui/LiveRecord.js:190:34)
+    at LiveRecord.render (http://localhost:8080/js/ui/LiveRecord.js:73:27)
+    at App._renderLive (http://localhost:8080/js/app.js:223:10)
+    at Object.handler (http://localhost:8080/js/app.js:44:38)
+    at Router._onHashChange (http://localhost:8080/js/router.js:49:15)

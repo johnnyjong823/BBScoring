@@ -1,0 +1,211 @@
+/* ====================================
+   BBScoring - Responsive (Mobile First)
+   ==================================== */
+
+/* === 手機直向 < 576px（預設） === */
+.live-layout__sidebar {
+  display: none;
+}
+
+.tab-bar {
+  display: flex;
+}
+
+.bottom-bar .scoreboard__table {
+  font-size: var(--fs-small);
+}
+
+.status-bar__score {
+  font-size: var(--fs-sub);
+}
+
+.status-bar__info {
+  font-size: var(--fs-small);
+  gap: var(--space-sm);
+}
+
+/* 首頁內容留白 */
+.home-layout__body {
+  padding: var(--space-md);
+}
+
+/* 快速新增球員 - 防止按鈕被截斷 */
+.quick-add {
+  flex-wrap: nowrap;
+}
+
+.quick-add .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Drawer 面板在手機上全寬 */
+.menu-drawer {
+  width: 100vw;
+  max-width: 100vw;
+}
+
+/* 數據統計表格 - 橫向捲動 */
+.stats-view__body {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stats-table {
+  min-width: 600px;
+}
+
+.stats-table th,
+.stats-table td {
+  white-space: nowrap;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+/* 投球按鈕二行排列優化 */
+.pitch-buttons__secondary {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* === 手機橫向 576px+ === */
+@media (min-width: 576px) {
+  .pitch-buttons__primary .btn {
+    min-height: 70px;
+  }
+
+  .pitch-buttons__secondary {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .count-display {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-lg);
+  }
+
+  .runner-diagram {
+    width: 180px;
+    height: 180px;
+  }
+
+  /* 576px+ Drawer 恢復正常寬度 */
+  .menu-drawer {
+    width: 320px;
+    max-width: 85vw;
+  }
+}
+
+/* === 平板直向 768px+ === */
+@media (min-width: 768px) {
+  .live-layout__sidebar {
+    display: block;
+    width: 200px;
+  }
+
+  .tab-bar {
+    display: none;
+  }
+
+  .status-bar__score {
+    font-size: var(--fs-button);
+  }
+
+  .pitch-buttons__primary .btn {
+    min-height: 80px;
+    font-size: var(--fs-scoreboard);
+  }
+
+  .slide-panel {
+    max-height: 75vh;
+    max-width: 600px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  .slide-panel.active,
+  .slide-panel.open {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .hit-result-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .runner-diagram {
+    width: 200px;
+    height: 200px;
+  }
+
+  .home-layout__body {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-md);
+    align-content: start;
+  }
+
+  .game-card {
+    margin-bottom: 0;
+  }
+}
+
+/* === 平板橫向 1024px+ === */
+@media (min-width: 1024px) {
+  .live-layout__sidebar {
+    width: 240px;
+  }
+
+  .live-layout__content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-md);
+    align-content: start;
+    padding: var(--space-lg);
+  }
+
+  .pitch-buttons {
+    grid-column: 1;
+  }
+
+  .live-layout__info {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .status-bar {
+    padding: var(--space-sm) var(--space-lg);
+  }
+
+  .slide-panel {
+    max-width: 700px;
+  }
+
+  .setup-layout__body {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+}
+
+/* === 桌面 1366px+ === */
+@media (min-width: 1366px) {
+  .live-layout__sidebar {
+    width: 280px;
+  }
+
+  .live-layout__content {
+    grid-template-columns: 1fr 1fr;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .setup-layout__body {
+    max-width: 800px;
+  }
+
+  .home-layout__body {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+}

@@ -1,0 +1,102 @@
+/* ====================================
+   BBScoring - Scoreboard
+   ==================================== */
+
+.scoreboard {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-sm);
+}
+
+.scoreboard__table {
+  width: 100%;
+  min-width: 480px;
+  font-family: var(--font-score);
+  font-size: var(--fs-sub);
+  border-collapse: collapse;
+}
+
+.scoreboard__table th,
+.scoreboard__table td {
+  text-align: center;
+  padding: var(--space-xs) var(--space-sm);
+  min-width: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scoreboard__table th {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  font-weight: 400;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.scoreboard__table th.team-col {
+  min-width: 60px;
+  text-align: left;
+  padding-left: var(--space-md);
+}
+
+.scoreboard__table td.team-col {
+  text-align: left;
+  padding-left: var(--space-md);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.scoreboard__table td.team-col--away {
+  color: var(--team-away);
+}
+
+.scoreboard__table td.team-col--home {
+  color: var(--team-home);
+}
+
+/* 總計欄 */
+.scoreboard__table th.total-col,
+.scoreboard__table td.total-col {
+  background-color: rgba(255, 255, 255, 0.03);
+  font-weight: 700;
+  min-width: 32px;
+}
+
+.scoreboard__table td.total-col {
+  font-size: var(--fs-button);
+}
+
+/* 目前局數高亮 */
+.scoreboard__table td.current-inning {
+  background-color: rgba(41, 128, 185, 0.2);
+  border-color: var(--color-primary-light);
+  position: relative;
+}
+
+.scoreboard__table td.current-inning::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--color-primary-light);
+}
+
+/* 得分動畫 */
+.scoreboard__table td.score-change {
+  animation: scoreFlash 500ms ease;
+}
+
+/* 淺色模式 */
+[data-theme="light"] .scoreboard__table th,
+[data-theme="light"] .scoreboard__table td {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .scoreboard__table th {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .scoreboard__table th.total-col,
+[data-theme="light"] .scoreboard__table td.total-col {
+  background-color: rgba(0, 0, 0, 0.05);
+}

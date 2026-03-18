@@ -1,0 +1,702 @@
+/* ====================================
+   BBScoring - Components
+   ==================================== */
+
+/* === 比數列 === */
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.score-row__team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-family: var(--font-score);
+}
+
+.score-row__team.active {
+  color: var(--color-primary-light);
+}
+
+.score-row__name {
+  font-size: var(--fs-button);
+  font-weight: 700;
+}
+
+.score-row__runs {
+  font-size: var(--fs-scoreboard);
+  font-weight: 700;
+}
+
+.score-row__vs {
+  font-size: var(--fs-sub);
+  color: var(--text-muted);
+}
+
+/* === 打者資訊 === */
+.batter-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--fs-button);
+}
+
+.batter-info__order {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.batter-info__number {
+  color: var(--color-primary-light);
+  font-weight: 500;
+}
+
+.batter-info__name {
+  font-weight: 700;
+}
+
+.batter-info__pos {
+  color: var(--text-muted);
+  font-size: var(--fs-sub);
+}
+
+/* === 壘包圖容器 === */
+.live-layout__runner {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-sm) 0;
+}
+
+/* === 投球按鈕區 === */
+.pitch-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+}
+
+.pitch-buttons__batter-info {
+  text-align: center;
+  padding: var(--space-sm);
+}
+
+.pitch-buttons__batter-info .name {
+  font-size: var(--fs-inning);
+  font-weight: 700;
+}
+
+.pitch-buttons__batter-info .matchup {
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+}
+
+.pitch-buttons__primary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.pitch-buttons__primary .btn {
+  min-height: var(--touch-primary);
+  font-size: var(--fs-inning);
+  font-weight: 700;
+}
+
+.pitch-buttons__secondary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+}
+
+.pitch-buttons__secondary .btn {
+  font-size: var(--fs-sub);
+  min-height: var(--touch-min);
+}
+
+.pitch-buttons__extra {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.pitch-buttons__extra .btn {
+  flex: 1;
+  font-size: var(--fs-sub);
+}
+
+/* === 球數顯示 === */
+.count-display {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+}
+
+.count-display__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.count-display__label {
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+  width: 50px;
+  text-align: right;
+}
+
+.count-display__dots {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.count-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-round);
+  border: 2px solid;
+  transition: background-color var(--transition-fast);
+}
+
+.count-dot--strike {
+  border-color: var(--color-strike);
+}
+
+.count-dot--strike.filled {
+  background-color: var(--color-strike);
+}
+
+.count-dot--ball {
+  border-color: var(--color-ball);
+}
+
+.count-dot--ball.filled {
+  background-color: var(--color-ball);
+}
+
+.count-dot--out {
+  border-color: var(--color-foul);
+}
+
+.count-dot--out.filled {
+  background-color: var(--color-foul);
+}
+
+.count-dot--foul {
+  border-color: var(--color-foul);
+}
+
+.count-dot--foul.filled {
+  background-color: var(--color-foul);
+}
+
+.count-display__text {
+  font-family: var(--font-score);
+  font-size: var(--fs-button);
+  font-weight: 700;
+  margin-left: auto;
+}
+
+/* === 打序面板 === */
+.lineup-list {
+  padding: var(--space-sm);
+}
+
+.lineup-list__title {
+  padding: var(--space-sm);
+  font-size: var(--fs-sub);
+  font-weight: 700;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.lineup-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sub);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.lineup-item:active {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.lineup-item.current {
+  background-color: rgba(41, 128, 185, 0.2);
+  border-left: 3px solid var(--color-primary-light);
+}
+
+.lineup-item.completed {
+  opacity: 0.6;
+}
+
+.lineup-item__order {
+  width: 20px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.lineup-item__pos {
+  width: 28px;
+  text-align: center;
+  font-size: var(--fs-small);
+  color: var(--text-secondary);
+}
+
+.lineup-item__number {
+  font-family: var(--font-number);
+  font-weight: 700;
+  color: var(--color-primary-light);
+  width: 30px;
+}
+
+.lineup-item__name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 投手資訊 */
+.pitcher-info {
+  padding: var(--space-sm);
+  margin-top: var(--space-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pitcher-info__label {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+.pitcher-info__detail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+/* === 打擊結果面板 === */
+.hit-result-section {
+  margin-bottom: var(--space-lg);
+}
+
+.hit-result-section__title {
+  font-size: var(--fs-sub);
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.hit-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+}
+
+.hit-result-grid .btn {
+  font-size: var(--fs-sub);
+  padding: var(--space-sm);
+  min-height: var(--touch-min);
+}
+
+/* 安打按鈕 */
+.btn--hit-1b { background-color: var(--color-hit); color: #fff; }
+.btn--hit-2b { background-color: #2471a3; color: #fff; }
+.btn--hit-3b { background-color: #1a5276; color: #fff; }
+.btn--hit-hr { background-color: var(--color-hr); color: #fff; }
+
+/* 出局按鈕 */
+.btn--out { background-color: rgba(231, 76, 60, 0.8); color: #fff; }
+
+/* 其他按鈕 */
+.btn--other { background-color: var(--bg-input); color: var(--text-primary); }
+
+/* 球質按鈕組 */
+.hit-type-group {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.hit-type-group .btn {
+  flex: 1;
+  min-width: 60px;
+}
+
+/* 守備路徑 */
+.fielding-path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.fielding-path__node {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-input);
+  border-radius: var(--radius-md);
+  font-family: var(--font-score);
+  font-weight: 700;
+}
+
+.fielding-path__arrow {
+  color: var(--text-muted);
+  font-size: var(--fs-inning);
+}
+
+/* === 比賽卡片（首頁） === */
+.game-card {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.game-card:active {
+  transform: scale(0.98);
+}
+
+.game-card__status {
+  margin-bottom: var(--space-sm);
+}
+
+.game-card__title {
+  font-size: var(--fs-button);
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+}
+
+.game-card__score {
+  font-family: var(--font-score);
+  font-size: var(--fs-inning);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.game-card__meta {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  margin-top: var(--space-sm);
+}
+
+.game-card__actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  justify-content: flex-end;
+}
+
+/* === 球員新增表格 === */
+.player-table {
+  width: 100%;
+  font-size: var(--fs-sub);
+}
+
+.player-table th {
+  text-align: left;
+  padding: var(--space-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  vertical-align: middle;
+}
+
+.player-table tr:active {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* 快速新增列 */
+.quick-add {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-md) 0;
+  overflow: hidden;
+}
+
+.quick-add .input {
+  width: auto;
+  min-width: 0;
+}
+
+.quick-add .input--number {
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.quick-add .input--name {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-add .btn {
+  flex-shrink: 0;
+}
+
+/* === 打序編輯 === */
+.lineup-editor__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xs);
+  cursor: grab;
+  touch-action: none;
+}
+
+.lineup-editor__item:active {
+  cursor: grabbing;
+  box-shadow: var(--shadow-md);
+}
+
+.lineup-editor__handle {
+  color: var(--text-muted);
+  padding: var(--space-xs);
+  font-size: var(--fs-inning);
+  cursor: grab;
+}
+
+.lineup-editor__order {
+  font-weight: 700;
+  width: 24px;
+  text-align: center;
+}
+
+.lineup-editor__player {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.lineup-editor__pos-select {
+  background-color: var(--bg-input);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--text-primary);
+  font-size: var(--fs-sub);
+  min-height: 36px;
+}
+
+/* === 歷史記錄 === */
+.history-item {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.history-item:active {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.history-item--modified {
+  border-left-color: var(--color-foul);
+}
+
+.history-item--hit {
+  border-left-color: var(--color-hit);
+}
+
+.history-item--out {
+  border-left-color: var(--color-out);
+}
+
+.history-item--special {
+  border-left-color: var(--color-hr);
+}
+
+.history-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-sub);
+  font-weight: 700;
+}
+
+.history-item__result {
+  font-size: var(--fs-sub);
+  margin-top: var(--space-xs);
+}
+
+.history-item__pitches {
+  font-family: var(--font-score);
+  font-size: var(--fs-small);
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+}
+
+.history-inning-header {
+  font-size: var(--fs-sub);
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: var(--space-sm) 0;
+  margin-top: var(--space-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* === 確認頁 === */
+.confirm-section {
+  margin-bottom: var(--space-lg);
+}
+
+.confirm-section__title {
+  font-size: var(--fs-button);
+  font-weight: 700;
+  margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.confirm-lineup {
+  font-size: var(--fs-sub);
+}
+
+.confirm-lineup__row {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+}
+
+/* === 設定頁 === */
+.settings-section {
+  margin-bottom: var(--space-xl);
+}
+
+.settings-section__title {
+  font-size: var(--fs-sub);
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: var(--space-md);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-item__label {
+  font-size: var(--fs-player);
+}
+
+/* Toggle 開關 */
+.toggle {
+  width: 48px;
+  height: 28px;
+  background-color: var(--bg-input);
+  border-radius: 14px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.toggle.active {
+  background-color: var(--color-primary-light);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background-color: #fff;
+  border-radius: var(--radius-round);
+  top: 3px;
+  left: 3px;
+  transition: transform var(--transition-fast);
+}
+
+.toggle.active::after {
+  transform: translateX(20px);
+}
+
+/* === 數據統計 === */
+.stats-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.stats-view__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stats-view__header h3 {
+  font-size: var(--fs-body);
+  font-weight: 700;
+}
+
+.stats-view__tabs,
+.stats-view__team-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.stats-view__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm);
+}
+
+.stats-table {
+  border-collapse: collapse;
+}
+
+.stats-table th {
+  text-align: center;
+}
+
+.stats-table td {
+  text-align: center;
+}
+
+.stats-table td:nth-child(2) {
+  text-align: left;
+}

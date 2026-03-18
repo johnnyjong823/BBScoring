@@ -1,0 +1,9 @@
+[     271ms] TypeError: Cannot read properties of null (reading 'map')
+    at StorageManager.loadAllGames (http://localhost:8080/js/storage/StorageManager.js:52:29)
+    at App._renderHome (http://localhost:8080/js/app.js:79:32)
+    at Object.handler (http://localhost:8080/js/app.js:41:29)
+    at Router._onHashChange (http://localhost:8080/js/router.js:49:15)
+    at Router.start (http://localhost:8080/js/router.js:28:10)
+    at App.init (http://localhost:8080/js/app.js:49:17)
+    at HTMLDocument.<anonymous> (http://localhost:8080/js/app.js:399:57)
+[     357ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:8080/:0

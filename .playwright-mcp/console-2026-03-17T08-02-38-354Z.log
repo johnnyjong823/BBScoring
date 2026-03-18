@@ -1,0 +1,6 @@
+[    3504ms] TypeError: Cannot read properties of undefined (reading 'away')
+    at LiveRecord._renderScoreRow (http://localhost:8080/js/ui/LiveRecord.js:148:50)
+    at LiveRecord.render (http://localhost:8080/js/ui/LiveRecord.js:57:27)
+    at App._renderLive (http://localhost:8080/js/app.js:218:10)
+    at Object.handler (http://localhost:8080/js/app.js:44:38)
+    at Router._onHashChange (http://localhost:8080/js/router.js:49:15)

@@ -1,0 +1,7 @@
+[  351325ms] TypeError: atBats.forEach is not a function
+    at StatsCalculator.calcPitcherStats (http://localhost:8102/js/core/StatsCalculator.js:71:12)
+    at http://localhost:8102/js/ui/StatsView.js:145:37
+    at Array.forEach (<anonymous>)
+    at StatsView._renderPitchingStats (http://localhost:8102/js/ui/StatsView.js:140:16)
+    at StatsView.render (http://localhost:8102/js/ui/StatsView.js:63:12)
+    at HTMLButtonElement.onClick (http://localhost:8102/js/ui/StatsView.js:41:56)
