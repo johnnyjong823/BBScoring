@@ -31,7 +31,10 @@ export const PITCH_RESULTS_INFO = {
   IBB: { name: '故意四壞', category: 'SPECIAL', endAtBat: true, result: 'IBB' },
   WP:  { name: '暴投',     category: 'SPECIAL' },
   PB:  { name: '捕逸',     category: 'SPECIAL' },
-  BK:  { name: '投手犯規', category: 'SPECIAL' }
+  BK:  { name: '投手犯規', category: 'SPECIAL' },
+  CI:  { name: '捕手妨礙', category: 'SPECIAL', endAtBat: true, result: 'CI' },
+  OI:  { name: '妨礙守備', category: 'SPECIAL' },
+  OBS: { name: '妨礙跑壘', category: 'SPECIAL' }
 };
 
 // 投球結果鍵 (字串常數)
@@ -47,7 +50,10 @@ export const PITCH_RESULTS = {
   IBB: 'IBB',
   WP: 'WP',
   PB: 'PB',
-  BK: 'BK'
+  BK: 'BK',
+  CI: 'CI',
+  OI: 'OI',
+  OBS: 'OBS'
 };
 
 // 打擊結果 (詳細物件)
@@ -75,7 +81,8 @@ export const HIT_RESULTS_INFO = {
   BB:    { name: '四壞保送',     category: 'WALK',  noAB: true },
   HBP:   { name: '觸身球',       category: 'HBP',   noAB: true },
   IBB:   { name: '故意四壞',     category: 'WALK',  noAB: true },
-  INT:   { name: '打擊妨礙',     category: 'OTHER', noAB: true }
+  INT:   { name: '打擊妨礙',     category: 'OTHER', noAB: true },
+  CI:    { name: '捕手妨礙',     category: 'OTHER', noAB: true }
 };
 
 // 打擊結果鍵 (字串常數)
@@ -217,7 +224,9 @@ export const RUNNER_EVENTS = {
   BK:    'BK',
   ERROR: 'ERROR',
   FC:    'FC',
-  PO:    'PO'
+  PO:    'PO',
+  OI:    'OI',
+  OBS:   'OBS'
 };
 
 // 打擊/投球慣用手

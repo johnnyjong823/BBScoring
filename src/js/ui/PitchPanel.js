@@ -103,6 +103,15 @@ export class PitchPanel {
     row3.appendChild(this._btn('投手犯規', 'btn--sm btn--wp', () => this._emit(PITCH_RESULTS.BK)));
     frag.appendChild(row3);
 
+    // Row 4: 妨礙 (small)
+    const row4 = createElement('div', { className: 'pitch-buttons__extra' });
+    row4.appendChild(this._btn('捕手妨礙', 'btn--sm btn--special', () => this._emit(PITCH_RESULTS.CI)));
+    row4.appendChild(this._btn('妨礙守備', 'btn--sm btn--special', () => this._emit(PITCH_RESULTS.OI)));
+    if (this.hasRunners) {
+      row4.appendChild(this._btn('妨礙跑壘', 'btn--sm btn--special', () => this._emit(PITCH_RESULTS.OBS)));
+    }
+    frag.appendChild(row4);
+
     return frag;
   }
 

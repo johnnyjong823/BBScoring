@@ -133,7 +133,7 @@ export class RulesEngine {
       }
       newRunners.first = batterId;
       movements.push({ runnerId: batterId, from: 'home', to: 'first', event: 'HIT', scored: false, earnedRun: false });
-    } else if (info.category === 'WALK' || resultType === 'HBP' || resultType === 'IBB') {
+    } else if (info.category === 'WALK' || resultType === 'HBP' || resultType === 'IBB' || resultType === 'CI') {
       // 保送 / 觸身球
       if (runners.third) {
         if (runners.second && runners.first) {

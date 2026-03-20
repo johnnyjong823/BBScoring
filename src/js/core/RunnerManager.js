@@ -78,6 +78,20 @@ export class RunnerManager {
     this.state.runners[base] = null;
   }
 
+  /** 放置跑者到指定壘包 */
+  placeRunner(base, runnerId) {
+    this.state.runners[base] = runnerId;
+  }
+
+  /** 移動跑者 (from → to) */
+  moveRunner(from, to) {
+    const runnerId = this.state.runners[from];
+    if (!runnerId) return;
+    this.state.runners[from] = null;
+    if (to !== 'home') this.state.runners[to] = runnerId;
+    return runnerId;
+  }
+
   /**
    * 自訂推進跑者 (WP/PB/BK 時由 UI 指定每位跑者前進幾個壘包)
    * @param {Array} advances - [{from:'first', bases:1}, {from:'second', bases:2}, ...]

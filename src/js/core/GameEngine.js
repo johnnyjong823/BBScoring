@@ -91,7 +91,7 @@ export class GameEngine {
 
     const pitchInfo = PITCH_RESULTS_INFO[pitchResult];
 
-    // 觸身球 / 故意四壞 — 直接結束打席
+    // 觸身球 / 故意四壞 / 捕手妨礙 — 直接結束打席
     if (pitchInfo && pitchInfo.endAtBat) {
       if (pitchResult === 'HBP') {
         this.recorder.setHBP();
@@ -99,6 +99,8 @@ export class GameEngine {
         // IBB: 補足壞球到 4 顆（如原本 1 壞球則 +3）
         this.game.currentState.balls = 4;
         this.recorder.setIBB();
+      } else if (pitchResult === 'CI') {
+        this.recorder.setResult('CI');
       }
       const { movements, runs } = this._autoAdvance(pitchInfo.result, this.recorder.getCurrentAtBat().batterId);
       this.recorder.setRunnerMovements(movements);
@@ -169,6 +171,22 @@ export class GameEngine {
       return;
     }
 
+    // 妨礙守備 — UI 會彈 modal 選擇妨礙者並處理出局
+    if (pitchResult === 'OI') {
+      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+      this._save();
+      this.emit('pitchRecorded', { result: pitchResult, needsInterferenceModal: true });
+      return;
+    }
+
+    // 妨礙跑壘 — UI 會彈 modal 選擇被妨礙跑者並處理進壘
+    if (pitchResult === 'OBS') {
+      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+      this._save();
+      this.emit('pitchRecorded', { result: pitchResult, needsObstructionModal: true });
+      return;
+    }
+
     // 打出去 — 等待打擊結果
     if (pitchResult === 'IP') {
       this.game.currentState.waitingForHitResult = true;
@@ -194,8 +212,21 @@ export class GameEngine {
     }
 
     if (result === 'STRIKEOUT') {
-      // 三振
       const looking = pitchResult === 'S';
+      // 不死三振條件: 揮空或過半 (非界外觸擊), 且一壘空或兩出局
+      const firstEmpty = !this.game.currentState.runners.first;
+      const twoOuts = this.game.currentState.outs >= 2;
+      const canDroppedK = !looking && (firstEmpty || twoOuts);
+
+      if (canDroppedK) {
+        // 不直接記出局，改由 UI 確認是否為不死三振
+        this.recorder.setStrikeout(looking);
+        this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+        this._save();
+        this.emit('pitchRecorded', { result: pitchResult, countResult: result, droppedThirdStrike: true });
+        return;
+      }
+      // 正常三振
       this.recorder.setStrikeout(looking);
       this.game.currentState.outs++;
       this._finishAtBat();
@@ -211,6 +242,115 @@ export class GameEngine {
     this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
     this._save();
     this.emit('pitchRecorded', { result: pitchResult, countResult: result });
+  }
+
+  // ===================== 不死三振 =====================
+
+  /** 不死三振 — 打者三振但未被接住，跑上壘包 */
+  applyDroppedThirdStrike(reached = true) {
+    if (!this.game) return;
+    const beforeState = deepClone(this.game.currentState);
+    const beforeAtBat = deepClone(this.recorder.getCurrentAtBat());
+    const beforeInnings = deepClone(this.game.innings);
+
+    if (reached) {
+      // 打者跑上一壘 (投手仍記三振，打者不記出局)
+      const batterId = this.recorder.getCurrentAtBat().batterId;
+      this.runnerMgr.placeRunner('first', batterId);
+      const ab = this.recorder.getCurrentAtBat();
+      if (ab) {
+        ab.result = 'K';
+        ab.events.push({
+          pitchNumber: ab.pitchCount,
+          type: 'DROPPED_K',
+          description: '不死三振 — 打者上壘'
+        });
+      }
+      this._finishAtBat();
+    } else {
+      // 正常三振出局
+      this.game.currentState.outs++;
+      this._finishAtBat();
+    }
+
+    this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+    this._save();
+    this.emit('pitchRecorded', { result: 'K', droppedK: reached });
+  }
+
+  // ===================== 妨礙守備 =====================
+
+  /** 妨礙守備 — 妨礙者出局 */
+  applyOffensiveInterference({ interfererId, interfererBase, additionalOuts = [] }) {
+    if (!this.game) return;
+    const beforeState = deepClone(this.game.currentState);
+    const beforeAtBat = deepClone(this.recorder.getCurrentAtBat());
+    const beforeInnings = deepClone(this.game.innings);
+
+    // 妨礙者出局
+    const allOuts = [{ id: interfererId, base: interfererBase }, ...additionalOuts];
+    allOuts.forEach(o => {
+      this.game.currentState.outs++;
+      if (o.base && o.base !== 'batter') {
+        this.runnerMgr.removeRunner(o.base);
+      }
+    });
+
+    const ab = this.recorder.getCurrentAtBat();
+    if (ab) {
+      ab.events.push({
+        pitchNumber: ab.pitchCount,
+        type: 'OI',
+        description: `妨礙守備 — ${interfererBase === 'batter' ? '打者' : interfererBase + '跑者'}出局`
+      });
+    }
+
+    // 如果妨礙者是打者，結束打席 (handles 3-out check internally)
+    if (interfererBase === 'batter') {
+      this._finishAtBat();
+    } else if (this.game.currentState.outs >= 3) {
+      // Runner interference caused 3rd out — end half inning via _finishAtBat
+      this._finishAtBat();
+    }
+    this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+    this._save();
+    this.emit('stateChanged');
+  }
+
+  // ===================== 妨礙跑壘 =====================
+
+  /** 妨礙跑壘 — 被妨礙跑者獲得進壘 */
+  applyObstruction({ runnerId, runnerBase, advanceTo }) {
+    if (!this.game) return;
+    const beforeState = deepClone(this.game.currentState);
+    const beforeAtBat = deepClone(this.recorder.getCurrentAtBat());
+    const beforeInnings = deepClone(this.game.innings);
+
+    let runs = 0;
+    if (advanceTo === 'home') {
+      this.runnerMgr.removeRunner(runnerBase);
+      runs = 1;
+    } else {
+      this.runnerMgr.moveRunner(runnerBase, advanceTo);
+    }
+    if (runs > 0) this._addRuns(runs);
+
+    const ab = this.recorder.getCurrentAtBat();
+    if (ab) {
+      ab.events.push({
+        pitchNumber: ab.pitchCount,
+        type: 'OBS',
+        runnerId,
+        from: runnerBase,
+        to: advanceTo,
+        description: `妨礙跑壘 — ${runnerBase}跑者進${advanceTo}`
+      });
+      ab.runnerMovements.push({ runnerId, from: runnerBase, to: advanceTo, event: 'OBS', earnedRun: false });
+    }
+
+    this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+    this._save();
+    this.emit('stateChanged');
   }
 
   // ===================== 打擊結果 =====================

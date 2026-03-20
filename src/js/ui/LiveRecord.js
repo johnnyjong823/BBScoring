@@ -56,6 +56,18 @@ export class LiveRecord {
       if (data?.result === 'PB' && !data?.needsAdvancement) {
         this._incrementInningErrors();
       }
+      // 不死三振: ask if batter reached
+      if (data?.droppedThirdStrike) {
+        this._showDroppedThirdStrikeModal();
+      }
+      // 妨礙守備: show interference modal
+      if (data?.needsInterferenceModal) {
+        this._showOffensiveInterferenceModal();
+      }
+      // 妨礙跑壘: show obstruction modal
+      if (data?.needsObstructionModal) {
+        this._showObstructionModal();
+      }
     });
     this.engine.on('hitResultRecorded', () => this._updateDisplay());
     this.engine.on('halfInningChanged', () => this._updateDisplay());
@@ -638,6 +650,218 @@ export class LiveRecord {
     this.engine._save();
     this._updateDisplay();
     showToast('盜壘記錄完成');
+  }
+
+  // ═══════════════════════════════════════════
+  // 不死三振 Modal
+  // ═══════════════════════════════════════════
+
+  _showDroppedThirdStrikeModal() {
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+
+    const hdr = createElement('div', { className: 'modal__header' });
+    hdr.appendChild(createElement('h3', { textContent: '不死三振' }));
+    modal.appendChild(hdr);
+
+    const body = createElement('div', { className: 'modal__body', style: 'padding:var(--space-md)' });
+    body.appendChild(createElement('p', {
+      textContent: '捕手未確實接住第三個好球，打者是否跑上一壘？',
+      style: 'margin-bottom:var(--space-md)'
+    }));
+
+    const row = createElement('div', { style: 'display:flex;gap:var(--space-sm)' });
+    row.appendChild(createElement('button', {
+      className: 'btn btn--primary btn--block',
+      textContent: '是 — 打者上壘 (不死三振)',
+      onClick: () => { this.engine.applyDroppedThirdStrike(true); overlay.remove(); this._updateDisplay(); showToast('不死三振 — 打者上壘'); }
+    }));
+    row.appendChild(createElement('button', {
+      className: 'btn btn--danger btn--block',
+      textContent: '否 — 正常三振出局',
+      onClick: () => { this.engine.applyDroppedThirdStrike(false); overlay.remove(); this._updateDisplay(); showToast('三振出局'); }
+    }));
+    body.appendChild(row);
+    modal.appendChild(body);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
+  // ═══════════════════════════════════════════
+  // 妨礙守備 Modal
+  // ═══════════════════════════════════════════
+
+  _showOffensiveInterferenceModal() {
+    const runners = this.engine.game.currentState.runners;
+    const runnersInfo = this.engine.getRunnersInfo();
+    const baseLabel = { first: '一壘', second: '二壘', third: '三壘' };
+
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+
+    let selectedBase = null; // 'batter' or 'first'/'second'/'third'
+
+    const draw = () => {
+      modal.innerHTML = '';
+      const hdr = createElement('div', { className: 'modal__header' });
+      hdr.appendChild(createElement('h3', { textContent: '妨礙守備 — 選擇妨礙者' }));
+      modal.appendChild(hdr);
+
+      const body = createElement('div', { className: 'modal__body', style: 'padding:var(--space-md)' });
+
+      // Batter option
+      const batterBtn = createElement('button', {
+        className: `btn btn--block ${selectedBase === 'batter' ? 'btn--danger' : 'btn--outline'}`,
+        textContent: '打者妨礙',
+        style: 'margin-bottom:var(--space-sm)',
+        onClick: () => { selectedBase = 'batter'; draw(); }
+      });
+      body.appendChild(batterBtn);
+
+      // Runner options
+      ['first', 'second', 'third'].forEach(base => {
+        if (!runners[base]) return;
+        const info = runnersInfo[base];
+        const btn = createElement('button', {
+          className: `btn btn--block ${selectedBase === base ? 'btn--danger' : 'btn--outline'}`,
+          textContent: `${baseLabel[base]}跑者 — ${info?.name || '?'} #${info?.number || '?'}`,
+          style: 'margin-bottom:var(--space-sm)',
+          onClick: () => { selectedBase = base; draw(); }
+        });
+        body.appendChild(btn);
+      });
+
+      if (selectedBase) {
+        const confirmRow = createElement('div', { style: 'display:flex;gap:var(--space-sm);margin-top:var(--space-md)' });
+        confirmRow.appendChild(createElement('button', {
+          className: 'btn btn--danger btn--block',
+          textContent: `確認 — ${selectedBase === 'batter' ? '打者' : baseLabel[selectedBase] + '跑者'}出局`,
+          onClick: () => {
+            const interfererId = selectedBase === 'batter'
+              ? this.engine.recorder.getCurrentAtBat()?.batterId
+              : runners[selectedBase];
+            this.engine.applyOffensiveInterference({
+              interfererId,
+              interfererBase: selectedBase
+            });
+            overlay.remove();
+            this._updateDisplay();
+            showToast('妨礙守備 — 出局');
+          }
+        }));
+        confirmRow.appendChild(createElement('button', {
+          className: 'btn btn--outline btn--block',
+          textContent: '取消',
+          onClick: () => { this.engine.undo(); overlay.remove(); this._updateDisplay(); }
+        }));
+        body.appendChild(confirmRow);
+      } else {
+        body.appendChild(createElement('button', {
+          className: 'btn btn--outline btn--block',
+          textContent: '取消',
+          style: 'margin-top:var(--space-md)',
+          onClick: () => { this.engine.undo(); overlay.remove(); this._updateDisplay(); }
+        }));
+      }
+
+      modal.appendChild(body);
+    };
+
+    draw();
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  }
+
+  // ═══════════════════════════════════════════
+  // 妨礙跑壘 Modal
+  // ═══════════════════════════════════════════
+
+  _showObstructionModal() {
+    const runners = this.engine.game.currentState.runners;
+    const runnersInfo = this.engine.getRunnersInfo();
+    const baseLabel = { first: '一壘', second: '二壘', third: '三壘' };
+    const baseOrder = ['first', 'second', 'third', 'home'];
+
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+
+    let selectedBase = null;
+    let advanceTo = null;
+
+    const draw = () => {
+      modal.innerHTML = '';
+      const hdr = createElement('div', { className: 'modal__header' });
+      hdr.appendChild(createElement('h3', { textContent: '妨礙跑壘 — 選擇被妨礙跑者' }));
+      modal.appendChild(hdr);
+
+      const body = createElement('div', { className: 'modal__body', style: 'padding:var(--space-md)' });
+
+      // Runner options
+      ['first', 'second', 'third'].forEach(base => {
+        if (!runners[base]) return;
+        const info = runnersInfo[base];
+        const btn = createElement('button', {
+          className: `btn btn--block ${selectedBase === base ? 'btn--primary' : 'btn--outline'}`,
+          textContent: `${baseLabel[base]}跑者 — ${info?.name || '?'} #${info?.number || '?'}`,
+          style: 'margin-bottom:var(--space-sm)',
+          onClick: () => { selectedBase = base; advanceTo = null; draw(); }
+        });
+        body.appendChild(btn);
+      });
+
+      // If selected, show advance options
+      if (selectedBase) {
+        body.appendChild(createElement('div', {
+          className: 'section-label',
+          textContent: '進壘到:',
+          style: 'margin-top:var(--space-md)'
+        }));
+        const advRow = createElement('div', { style: 'display:flex;gap:var(--space-sm);flex-wrap:wrap' });
+        const fromIdx = baseOrder.indexOf(selectedBase);
+        for (let i = fromIdx + 1; i < baseOrder.length; i++) {
+          const target = baseOrder[i];
+          const label = target === 'home' ? '得分' : baseLabel[target];
+          advRow.appendChild(createElement('button', {
+            className: `btn ${advanceTo === target ? (target === 'home' ? 'btn--hit-hr' : 'btn--primary') : 'btn--outline'}`,
+            textContent: label,
+            onClick: () => { advanceTo = target; draw(); }
+          }));
+        }
+        body.appendChild(advRow);
+      }
+
+      if (selectedBase && advanceTo) {
+        body.appendChild(createElement('button', {
+          className: 'btn btn--primary btn--block',
+          textContent: '確認妨礙跑壘',
+          style: 'margin-top:var(--space-md)',
+          onClick: () => {
+            this.engine.applyObstruction({
+              runnerId: runners[selectedBase],
+              runnerBase: selectedBase,
+              advanceTo
+            });
+            overlay.remove();
+            this._updateDisplay();
+            showToast(`妨礙跑壘 — 跑者進${advanceTo === 'home' ? '本壘得分' : baseLabel[advanceTo]}`);
+          }
+        }));
+      }
+
+      body.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--block',
+        textContent: '取消',
+        style: 'margin-top:var(--space-sm)',
+        onClick: () => { this.engine.undo(); overlay.remove(); this._updateDisplay(); }
+      }));
+
+      modal.appendChild(body);
+    };
+
+    draw();
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
   }
 
   // ═══════════════════════════════════════════

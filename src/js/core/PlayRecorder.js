@@ -71,6 +71,12 @@ export class PlayRecorder {
     this.currentAtBat.result = createHitResult({ type: 'IBB' });
   }
 
+  /** 標記通用結果 (CI 等) */
+  setResult(type) {
+    if (!this.currentAtBat) return;
+    this.currentAtBat.result = createHitResult({ type });
+  }
+
   /** 完成打席 */
   finishAtBat() {
     const atBat = this.currentAtBat;
