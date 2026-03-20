@@ -499,10 +499,17 @@ export class HitResultPanel {
       outcomes.batter = { dest: d.baseReached || 'first' };
     } else if (d.resultType === 'FC') {
       // FC: batter reaches first, specified runner is out
+      // Other runners advance if forced (batter occupying first pushes chain)
       outcomes.batter = { dest: 'first' };
-      if (runners.third) outcomes.third = { dest: d.fcOutRunner === 'third' ? 'out' : 'stay' };
-      if (runners.second) outcomes.second = { dest: d.fcOutRunner === 'second' ? 'out' : 'stay' };
-      if (runners.first) outcomes.first = { dest: d.fcOutRunner === 'first' ? 'out' : 'stay' };
+      if (runners.first) {
+        outcomes.first = { dest: d.fcOutRunner === 'first' ? 'out' : 'second' };
+      }
+      if (runners.second) {
+        outcomes.second = { dest: d.fcOutRunner === 'second' ? 'out' : (runners.first ? 'third' : 'stay') };
+      }
+      if (runners.third) {
+        outcomes.third = { dest: d.fcOutRunner === 'third' ? 'out' : ((runners.first && runners.second) ? 'home' : 'stay') };
+      }
     } else {
       // Fallback
       if (runners.third) outcomes.third = { dest: 'stay' };
@@ -625,10 +632,13 @@ export class HitResultPanel {
     if (outcomes.batter?.dest === 'home') runs++;
     if (outcomes.batter?.dest === 'out') outs++;
 
-    // RBI: runs scored, except errors don't count RBI, DP usually doesn't
+    // RBI: runs scored, except errors don't count RBI, DP/FC usually don't
     let rbi = runs;
     if (cat === 'ERROR') rbi = 0;
     if (this._data.resultType === 'DP') rbi = 0;
+    if (this._data.resultType === 'FC') rbi = 0;
+    // SAC bunt: no RBI; SF: RBI counts (both have cat 'SAC')
+    if (this._data.resultType === 'SAC') rbi = 0;
 
     return { runs, rbi, outs };
   }
@@ -744,6 +754,7 @@ export class HitResultPanel {
     const newRunners = { first: null, second: null, third: null };
     const movements = [];
     let runs = 0;
+    const isError = this._data.resultType === 'E';
 
     // Process each runner (third → first order)
     ['third', 'second', 'first'].forEach(base => {
@@ -755,7 +766,7 @@ export class HitResultPanel {
       if (dest === 'out') {
         movements.push({ runnerId, from: base, to: base, event: 'HIT', scored: false, earnedRun: false, out: true });
       } else if (dest === 'home') {
-        movements.push({ runnerId, from: base, to: 'home', event: 'HIT', scored: true, earnedRun: true });
+        movements.push({ runnerId, from: base, to: 'home', event: 'HIT', scored: true, earnedRun: !isError });
         runs++;
       } else if (dest === 'stay') {
         newRunners[base] = runnerId;
@@ -773,7 +784,7 @@ export class HitResultPanel {
       if (dest === 'out') {
         movements.push({ runnerId: batterId, from: 'home', to: 'home', event: 'HIT', scored: false, earnedRun: false, out: true });
       } else if (dest === 'home') {
-        movements.push({ runnerId: batterId, from: 'home', to: 'home', event: 'HIT', scored: true, earnedRun: true });
+        movements.push({ runnerId: batterId, from: 'home', to: 'home', event: 'HIT', scored: true, earnedRun: !isError });
         runs++;
       } else if (dest && dest !== 'stay') {
         newRunners[dest] = batterId;
