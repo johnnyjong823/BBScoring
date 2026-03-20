@@ -183,15 +183,13 @@ export class RulesEngine {
    * 判定比賽是否結束
    */
   static isGameOver(inning, halfInning, totalInnings, awayScore, homeScore) {
-    // 最後一局下半結束且主隊領先
-    if (inning >= totalInnings && halfInning === HALF_INNING.BOTTOM && homeScore > awayScore) {
-      return true;
-    }
-    // 最後一局結束
-    if (inning > totalInnings) {
-      // 非平手
+    // Bottom of regulation or extra inning
+    if (inning >= totalInnings && halfInning === HALF_INNING.BOTTOM) {
+      // Game over if either team leads (walk-off or regulation end)
+      // Continues only if tied (extra innings)
       return awayScore !== homeScore;
     }
+    // After top of any inning: home still bats, game continues
     return false;
   }
 }

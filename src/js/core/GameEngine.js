@@ -1,7 +1,7 @@
 /**
  * BBScoring — GameEngine 比賽引擎（狀態機）
  */
-import { GAME_STATUS, HALF_INNING, PITCH_RESULTS, PITCH_RESULTS_INFO, HIT_RESULTS, HIT_RESULTS_INFO, ACTION_TYPES } from '../utils/constants.js';
+import { GAME_STATUS, HALF_INNING, PITCH_RESULTS, PITCH_RESULTS_INFO, HIT_RESULTS, HIT_RESULTS_INFO, ACTION_TYPES, RECORDING_MODE } from '../utils/constants.js';
 import { deepClone, getTimestamp } from '../utils/helpers.js';
 import { createInning } from '../models/Inning.js';
 import { PlayRecorder } from './PlayRecorder.js';
@@ -84,6 +84,7 @@ export class GameEngine {
 
     const beforeState = deepClone(this.game.currentState);
     const beforeAtBat = deepClone(this.recorder.getCurrentAtBat());
+    const beforeInnings = deepClone(this.game.innings);
 
     // 記錄這球
     this.recorder.recordPitch(pitchResult);
@@ -101,7 +102,7 @@ export class GameEngine {
       this.recorder.setRunnerMovements(movements);
       this._addRuns(runs);
       this._finishAtBat();
-      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat);
+      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
       this._save();
       this.emit('pitchRecorded', { result: pitchResult, endAtBat: true });
       return;
@@ -110,7 +111,26 @@ export class GameEngine {
     // 暴投 / 捕逸 / 投手犯規 — 壘上跑者推進，球數也計算
     if (pitchResult === 'WP' || pitchResult === 'PB' || pitchResult === 'BK') {
       const event = pitchResult;
+
+      if (this.runnerMgr.hasRunners() && (pitchResult === 'WP' || pitchResult === 'PB')) {
+        // WP/PB with runners: defer advancement to UI (modal asks per-runner bases)
+        // Only record the ball count here; UI will call applyCustomAdvancement later
+        this.game.currentState.balls++;
+        if (this.game.currentState.balls >= 4) {
+          this.recorder.setWalk();
+          const { movements, runs } = this._autoAdvance('BB', this.recorder.getCurrentAtBat().batterId);
+          this.recorder.setRunnerMovements(movements);
+          this._addRuns(runs);
+          this._finishAtBat();
+        }
+        this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+        this._save();
+        this.emit('pitchRecorded', { result: pitchResult, needsAdvancement: true });
+        return;
+      }
+
       if (this.runnerMgr.hasRunners()) {
+        // BK with runners: auto-advance 1 base (standard rule)
         const { movements, runs } = this.runnerMgr.advanceAllRunners(event);
         this._addRuns(runs);
         // 將事件記錄到打席
@@ -127,8 +147,8 @@ export class GameEngine {
           movements.forEach(m => ab.runnerMovements.push(m));
         }
       }
-      // BK 計壞球
-      if (pitchResult === 'BK') {
+      // BK: 壘上無人計壞球，壘上有人僅推進不計壞球
+      if (pitchResult === 'BK' && !this.runnerMgr.hasRunners()) {
         this.game.currentState.balls++;
         if (this.game.currentState.balls >= 4) {
           this.recorder.setWalk();
@@ -138,7 +158,18 @@ export class GameEngine {
           this._finishAtBat();
         }
       }
-      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat);
+      // WP/PB without runners: count as ball
+      if ((pitchResult === 'WP' || pitchResult === 'PB') && !this.runnerMgr.hasRunners()) {
+        this.game.currentState.balls++;
+        if (this.game.currentState.balls >= 4) {
+          this.recorder.setWalk();
+          const { movements, runs } = this._autoAdvance('BB', this.recorder.getCurrentAtBat().batterId);
+          this.recorder.setRunnerMovements(movements);
+          this._addRuns(runs);
+          this._finishAtBat();
+        }
+      }
+      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
       this._save();
       this.emit('pitchRecorded', { result: pitchResult });
       return;
@@ -147,7 +178,7 @@ export class GameEngine {
     // 打出去 — 等待打擊結果
     if (pitchResult === 'IP') {
       this.game.currentState.waitingForHitResult = true;
-      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat);
+      this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
       this._save();
       this.emit('pitchRecorded', { result: pitchResult, needHitResult: true });
       return;
@@ -183,7 +214,7 @@ export class GameEngine {
       this._finishAtBat();
     }
 
-    this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat);
+    this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
     this._save();
     this.emit('pitchRecorded', { result: pitchResult, countResult: result });
   }
@@ -191,15 +222,27 @@ export class GameEngine {
   // ===================== 打擊結果 =====================
 
   /** 記錄打擊結果（打出去之後） */
-  recordHitResult({ type, hitType, direction, fieldingPath, rbi, isError, errorFielder, errorType, runnerOverrides }) {
+  recordHitResult({ type, hitType, direction, fieldingPath, rbi, isError, errorFielder, errorType, runnerOverrides, advancement, advancementReason, scored, baseReached, fcOutOccurred, fcOutRunner }) {
     if (!this.game || !this.recorder.getCurrentAtBat()) return;
 
     const beforeState = deepClone(this.game.currentState);
     const beforeAtBat = deepClone(this.recorder.getCurrentAtBat());
+    const beforeInnings = deepClone(this.game.innings);
 
     // 設定結果
     this.game.currentState.waitingForHitResult = false;
     this.recorder.setHitResult({ type, hitType, direction, fieldingPath, rbi: rbi || 0, isError, errorFielder, errorType });
+
+    // 設定額外詳細資訊
+    const ab = this.recorder.getCurrentAtBat();
+    if (ab && ab.result) {
+      if (advancement !== undefined) ab.result.advancement = advancement;
+      if (advancementReason !== undefined) ab.result.advancementReason = advancementReason;
+      if (scored !== undefined) ab.result.scored = scored;
+      if (baseReached !== undefined) ab.result.baseReached = baseReached;
+      if (fcOutOccurred !== undefined) ab.result.fcOutOccurred = fcOutOccurred;
+      if (fcOutRunner !== undefined) ab.result.fcOutRunner = fcOutRunner;
+    }
 
     // 出局
     const outsAdded = RulesEngine.getOutsFromResult(type);
@@ -242,9 +285,135 @@ export class GameEngine {
     }
 
     this._finishAtBat();
-    this._pushHistory(ACTION_TYPES.RECORD_HIT_RESULT, beforeState, beforeAtBat);
+    this._pushHistory(ACTION_TYPES.RECORD_HIT_RESULT, beforeState, beforeAtBat, beforeInnings);
     this._save();
     this.emit('hitResultRecorded', { type });
+  }
+
+  // ===================== Result-Only 打席直接記錄 =====================
+
+  /**
+   * Record an at-bat result directly (Result-Only mode).
+   * Skips pitch tracking entirely.
+   * @param {object} opts
+   * @param {string} opts.type - Result type (1B/2B/3B/HR/K/GO/FO/LO/DP/FC/SF/SAC/BB/IBB/HBP/E)
+   * @param {number} [opts.rbi=0] - RBI count
+   * @param {boolean} [opts.isError=false] - Whether this was an error
+   * @param {object} [opts.runnerOverrides] - Manual runner positions
+   */
+  recordAtBatDirect({ type, rbi = 0, isError = false, runnerOverrides }) {
+    if (!this.game || this.game.info.status !== GAME_STATUS.IN_PROGRESS) return;
+
+    const beforeState = deepClone(this.game.currentState);
+    const beforeAtBat = deepClone(this.recorder.getCurrentAtBat());
+    const beforeInnings = deepClone(this.game.innings);
+
+    // Mark the at-bat as Result-Only
+    const atBat = this.recorder.getCurrentAtBat();
+    if (atBat) {
+      atBat.recordingMode = RECORDING_MODE.RESULT_ONLY;
+    }
+
+    // Handle walk/HBP/IBB as special cases (use existing methods)
+    if (type === 'BB') {
+      this.recorder.setWalk();
+      const { movements, runs } = this._autoAdvance('BB', atBat.batterId);
+      this.recorder.setRunnerMovements(movements);
+      this._addRuns(runs);
+      this._finishAtBat();
+      this._pushHistory(ACTION_TYPES.RECORD_HIT_RESULT, beforeState, beforeAtBat, beforeInnings);
+      this._save();
+      this.emit('atBatDirectRecorded', { type });
+      return;
+    }
+
+    if (type === 'IBB') {
+      this.recorder.setIBB();
+      const { movements, runs } = this._autoAdvance('BB', atBat.batterId);
+      this.recorder.setRunnerMovements(movements);
+      this._addRuns(runs);
+      this._finishAtBat();
+      this._pushHistory(ACTION_TYPES.RECORD_HIT_RESULT, beforeState, beforeAtBat, beforeInnings);
+      this._save();
+      this.emit('atBatDirectRecorded', { type });
+      return;
+    }
+
+    if (type === 'HBP') {
+      this.recorder.setHBP();
+      const { movements, runs } = this._autoAdvance('HBP', atBat.batterId);
+      this.recorder.setRunnerMovements(movements);
+      this._addRuns(runs);
+      this._finishAtBat();
+      this._pushHistory(ACTION_TYPES.RECORD_HIT_RESULT, beforeState, beforeAtBat, beforeInnings);
+      this._save();
+      this.emit('atBatDirectRecorded', { type });
+      return;
+    }
+
+    if (type === 'K') {
+      this.recorder.setStrikeout(false);
+      this.game.currentState.outs++;
+      this._finishAtBat();
+      this._pushHistory(ACTION_TYPES.RECORD_HIT_RESULT, beforeState, beforeAtBat, beforeInnings);
+      this._save();
+      this.emit('atBatDirectRecorded', { type });
+      return;
+    }
+
+    // All other results: set hit result and process
+    this.recorder.setHitResult({
+      type,
+      hitType: null,
+      direction: null,
+      fieldingPath: null,
+      rbi: rbi || 0,
+      isError: isError || type === 'E',
+      errorFielder: null,
+      errorType: null
+    });
+
+    // Outs
+    const outsAdded = RulesEngine.getOutsFromResult(type);
+    this.game.currentState.outs += outsAdded;
+
+    // Runner advancement
+    if (!runnerOverrides) {
+      const { newRunners, movements, runs } = RulesEngine.autoAdvanceRunners(
+        this.game.currentState.runners,
+        type,
+        atBat.batterId
+      );
+      this.runnerMgr.setRunners(newRunners);
+      this.recorder.setRunnerMovements(movements);
+
+      // Auto-calculate RBI if not specified
+      if (!rbi && runs > 0 && !isError && type !== 'E' && type !== 'DP') {
+        this.recorder.getCurrentAtBat().result.rbi = runs;
+      } else if (rbi) {
+        this.recorder.getCurrentAtBat().result.rbi = rbi;
+      }
+
+      this._addRuns(runs);
+    } else {
+      this.runnerMgr.setRunners(runnerOverrides.newRunners);
+      this.recorder.setRunnerMovements(runnerOverrides.movements);
+      this._addRuns(runnerOverrides.runs || 0);
+    }
+
+    // Hit/Error stats
+    const currentHalf = this._getCurrentHalfInning();
+    if (RulesEngine.isHit(type) && currentHalf) {
+      currentHalf.hits++;
+    }
+    if ((isError || type === 'E') && currentHalf) {
+      currentHalf.errors++;
+    }
+
+    this._finishAtBat();
+    this._pushHistory(ACTION_TYPES.RECORD_HIT_RESULT, beforeState, beforeAtBat, beforeInnings);
+    this._save();
+    this.emit('atBatDirectRecorded', { type });
   }
 
   // ===================== 撤銷 / 重做 =====================
@@ -435,8 +604,17 @@ export class GameEngine {
     // 殘壘
     if (half) half.leftOnBase = this.runnerMgr.runnersOnBase();
 
+    // Walk-off: 下半局得分後主隊領先 → 比賽結束
+    const state = this.game.currentState;
+    if (runsThisAB > 0 && state.halfInning === HALF_INNING.BOTTOM &&
+        state.inning >= this.game.info.totalInnings &&
+        state.score.home > state.score.away) {
+      this.endGame();
+      return;
+    }
+
     // 檢查三出局
-    if (RulesEngine.isHalfInningOver(this.game.currentState.outs)) {
+    if (RulesEngine.isHalfInningOver(state.outs)) {
       this._endHalfInning();
       return;
     }
@@ -534,7 +712,7 @@ export class GameEngine {
     this.emit('scoreChanged', { side, runs, total: this.game.currentState.score });
   }
 
-  _pushHistory(type, beforeState, beforeAtBat) {
+  _pushHistory(type, beforeState, beforeAtBat, beforeInnings) {
     const action = {
       id: `action_${Date.now()}`,
       type,
@@ -543,7 +721,7 @@ export class GameEngine {
       before: {
         currentState: beforeState,
         affectedAtBat: beforeAtBat,
-        innings: deepClone(this.game.innings)
+        innings: beforeInnings || deepClone(this.game.innings)
       },
       after: {
         currentState: deepClone(this.game.currentState),

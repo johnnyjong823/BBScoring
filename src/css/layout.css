@@ -15,6 +15,11 @@
   z-index: var(--z-panel);
 }
 
+.status-bar__back {
+  margin-right: var(--space-xs);
+  font-size: 1.2rem;
+}
+
 .status-bar__score {
   display: flex;
   align-items: center;
@@ -89,10 +94,9 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* 推擠球數顯示和投球按鈕至底部（拇指區域） */
+/* 球數顯示區 */
 .count-display {
-  margin-top: auto;
-  padding-top: var(--space-md);
+  padding-top: var(--space-sm);
 }
 
 .live-layout__content {
@@ -398,8 +402,14 @@
 .menu-drawer__header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.menu-drawer__title {
+  font-weight: 600;
+  font-size: var(--fs-body);
 }
 
 .menu-drawer__item {

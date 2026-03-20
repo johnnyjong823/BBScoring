@@ -1,183 +1,718 @@
 /**
- * BBScoring — HitResultPanel UI (打擊結果面板，滑出式)
+ * BBScoring — HitResultPanel UI (步驟式擊出精靈)
+ *
+ * Step flow:
+ *   1. type       — 打擊類型 (滾地/飛球/平飛)
+ *   2. direction  — 守備路徑 (守位號碼，可連續追加)
+ *   3. result     — 結果分類 (安打/出局/失誤/野選)
+ *   3-1. hit      — 安打詳情 (一壘~全壘打, 進壘, 得分, 打點)
+ *   3-2. out      — 出局詳情 (依打擊類型過濾, 打點, 雙殺警告)
+ *   3-3. error    — 失誤詳情 (失誤守位, 上到幾壘)
+ *   3-4. fc       — 野選詳情 (有無出局, 哪位跑者出局)
+ *   4. notes      — 備註
  */
 import { createElement, showToast } from '../utils/helpers.js';
-import { HIT_TYPES, HIT_ZONES, HIT_RESULTS, RUNNER_EVENTS } from '../utils/constants.js';
-import { FieldDiagram } from './FieldDiagram.js';
+import { HIT_RESULTS_INFO } from '../utils/constants.js';
 import { createHitResult } from '../models/Play.js';
 import { Vibration } from '../utils/vibration.js';
 
+const POS_NUM_MAP = {
+  1: 'P', 2: 'C', 3: '1B', 4: '2B', 5: '3B',
+  6: 'SS', 7: 'LF', 8: 'CF', 9: 'RF'
+};
+
+const POS_LABELS = {
+  1: '1 投手', 2: '2 捕手', 3: '3 一壘', 4: '4 二壘', 5: '5 三壘',
+  6: '6 游擊', 7: '7 左外', 8: '8 中外', 9: '9 右外'
+};
+
+// Out types with compatible hit types
+const OUT_OPTIONS = [
+  { val: 'GO',  label: '滾地出局',   compatible: ['G', 'BU'] },
+  { val: 'FO',  label: '飛球出局',   compatible: ['F'] },
+  { val: 'LO',  label: '平飛出局',   compatible: ['L'] },
+  { val: 'IF',  label: '內野飛球',   compatible: ['F', 'P'] },
+  { val: 'FF',  label: '界外飛球',   compatible: ['F'] },
+  { val: 'SF',  label: '犧牲飛球',   compatible: ['F'] },
+  { val: 'SAC', label: '犧牲短打',   compatible: ['G', 'BU'] },
+  { val: 'DP',  label: '雙殺',       compatible: ['G', 'L'] },
+  { val: 'TP',  label: '三殺',       compatible: ['G', 'L'] },
+  { val: 'TAG', label: '觸殺',       compatible: ['G', 'L', 'F'] },
+];
+
 export class HitResultPanel {
-  constructor({ container, onResult, onCancel }) {
+  constructor({ container, onResult, onCancel, hasRunners, runners }) {
     this.container = container;
     this.onResult = onResult;
     this.onCancel = onCancel;
+    this.hasRunners = hasRunners || false;
+    this.runners = runners || { first: null, second: null, third: null };
 
-    this.selected = {
-      type: null,       // HIT_RESULTS
-      hitType: null,    // HIT_TYPES
-      zone: null,       // HIT_ZONES
-      fieldingPath: [], // position sequence
-      error: false,
+    this._step = 'type';
+    this._data = this._freshData();
+  }
+
+  _freshData() {
+    return {
+      hitType: null,
+      fieldingPath: [],
+      resultCategory: null,
+      resultType: null,
+      hitBases: null,
+      advancement: false,
+      advancementReason: null,
+      scored: false,
       rbi: 0,
-      runnerEvents: []
+      errorPosition: null,
+      baseReached: null,
+      fcOutOccurred: false,
+      fcOutRunner: null,
+      notes: ''
     };
   }
 
   render() {
     this.container.innerHTML = '';
-
     const panel = createElement('div', { className: 'hit-result-panel' });
-
-    // 標題列
-    const header = createElement('div', { className: 'hit-result-panel__header' });
-    header.appendChild(createElement('button', {
-      className: 'btn btn--icon', innerHTML: '✕',
-      onClick: () => { if (this.onCancel) this.onCancel(); }
-    }));
-    header.appendChild(createElement('h3', { textContent: '打擊結果' }));
-    header.appendChild(createElement('button', {
-      className: 'btn btn--primary btn--sm', textContent: '確認',
-      onClick: () => this._submit()
-    }));
-    panel.appendChild(header);
+    panel.appendChild(this._renderHeader());
 
     const body = createElement('div', { className: 'hit-result-panel__body scrollable' });
-
-    // 1. 結果類型
-    body.appendChild(createElement('div', { className: 'section-label', textContent: '結果' }));
-    const resultGrid = createElement('div', { className: 'hit-result-grid' });
-    const resultTypes = [
-      { val: HIT_RESULTS.SINGLE, label: '一安', cls: '' },
-      { val: HIT_RESULTS.DOUBLE, label: '二安', cls: '' },
-      { val: HIT_RESULTS.TRIPLE, label: '三安', cls: '' },
-      { val: HIT_RESULTS.HOME_RUN, label: '全壘打', cls: 'highlight' },
-      { val: HIT_RESULTS.GROUND_OUT, label: '滾地出局', cls: '' },
-      { val: HIT_RESULTS.FLY_OUT, label: '飛球出局', cls: '' },
-      { val: HIT_RESULTS.LINE_OUT, label: '平飛出局', cls: '' },
-      { val: HIT_RESULTS.POP_OUT, label: '內野飛球', cls: '' },
-      { val: HIT_RESULTS.FIELDERS_CHOICE, label: '野選', cls: '' },
-      { val: HIT_RESULTS.SACRIFICE_FLY, label: '犧飛', cls: '' },
-      { val: HIT_RESULTS.SACRIFICE_BUNT, label: '犧觸', cls: '' },
-      { val: HIT_RESULTS.DOUBLE_PLAY, label: '雙殺', cls: '' },
-      { val: HIT_RESULTS.TRIPLE_PLAY, label: '三殺', cls: '' },
-      { val: HIT_RESULTS.ERROR, label: '失誤', cls: '' },
-    ];
-    resultTypes.forEach(r => {
-      const btn = createElement('button', {
-        className: `btn btn--sm ${this.selected.type === r.val ? 'btn--primary' : 'btn--outline'} ${r.cls}`,
-        textContent: r.label,
-        onClick: () => { this.selected.type = r.val; Vibration.tap(); this.render(); }
-      });
-      resultGrid.appendChild(btn);
-    });
-    body.appendChild(resultGrid);
-
-    // 2. 打擊類型
-    body.appendChild(createElement('div', { className: 'section-label', textContent: '打擊類型' }));
-    const typeGrid = createElement('div', { className: 'hit-result-grid' });
-    const hitTypes = [
-      { val: HIT_TYPES.GROUND, label: '滾地' },
-      { val: HIT_TYPES.FLY, label: '飛球' },
-      { val: HIT_TYPES.LINE, label: '平飛' },
-      { val: HIT_TYPES.POPUP, label: '小飛球' },
-      { val: HIT_TYPES.BUNT, label: '觸擊' },
-    ];
-    hitTypes.forEach(h => {
-      const btn = createElement('button', {
-        className: `btn btn--sm ${this.selected.hitType === h.val ? 'btn--primary' : 'btn--outline'}`,
-        textContent: h.label,
-        onClick: () => { this.selected.hitType = h.val; this.render(); }
-      });
-      typeGrid.appendChild(btn);
-    });
-    body.appendChild(typeGrid);
-
-    // 3. 方向 (棒球場圖)
-    body.appendChild(createElement('div', { className: 'section-label', textContent: '方向' }));
-    const fieldContainer = createElement('div', { className: 'hit-result-panel__field' });
-    const fieldDiagram = new FieldDiagram({
-      container: fieldContainer,
-      selectedZone: this.selected.zone,
-      onZoneClick: (zone) => { this.selected.zone = zone; this.render(); }
-    });
-    fieldDiagram.render();
-    body.appendChild(fieldContainer);
-
-    // 4. 守備路徑 (簡易)
-    body.appendChild(createElement('div', { className: 'section-label', textContent: '守備路徑' }));
-    const fpRow = createElement('div', { className: 'fielding-path' });
-    const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
-    positions.forEach(pos => {
-      const btn = createElement('button', {
-        className: `btn btn--sm ${this.selected.fieldingPath.includes(pos) ? 'btn--primary' : 'btn--outline'}`,
-        textContent: pos,
-        onClick: () => {
-          const idx = this.selected.fieldingPath.indexOf(pos);
-          if (idx >= 0) this.selected.fieldingPath.splice(idx, 1);
-          else this.selected.fieldingPath.push(pos);
-          this.render();
-        }
-      });
-      fpRow.appendChild(btn);
-    });
-    body.appendChild(fpRow);
-    if (this.selected.fieldingPath.length > 0) {
-      body.appendChild(createElement('div', {
-        className: 'text-secondary text-sm',
-        textContent: `守備路徑: ${this.selected.fieldingPath.join(' → ')}`
-      }));
+    switch (this._step) {
+      case 'type':         body.appendChild(this._renderTypeStep()); break;
+      case 'direction':    body.appendChild(this._renderDirectionStep()); break;
+      case 'result':       body.appendChild(this._renderResultStep()); break;
+      case 'hit-detail':   body.appendChild(this._renderHitDetailStep()); break;
+      case 'out-detail':   body.appendChild(this._renderOutDetailStep()); break;
+      case 'error-detail': body.appendChild(this._renderErrorDetailStep()); break;
+      case 'fc-detail':    body.appendChild(this._renderFCDetailStep()); break;
+      case 'notes':        body.appendChild(this._renderNotesStep()); break;
     }
-
-    // 5. 失誤
-    const errorGroup = createElement('div', { className: 'form-group form-group--row' });
-    const errorLabel = createElement('label', { textContent: '失誤' });
-    const errorToggle = createElement('button', {
-      className: `btn btn--sm ${this.selected.error ? 'btn--danger' : 'btn--outline'}`,
-      textContent: this.selected.error ? 'E (失誤)' : '無失誤',
-      onClick: () => { this.selected.error = !this.selected.error; this.render(); }
-    });
-    errorGroup.append(errorLabel, errorToggle);
-    body.appendChild(errorGroup);
-
-    // 6. 打點
-    const rbiGroup = createElement('div', { className: 'form-group form-group--row' });
-    rbiGroup.appendChild(createElement('label', { textContent: '打點 (RBI)' }));
-    const rbiCtrl = createElement('div', { className: 'number-control' });
-    rbiCtrl.appendChild(createElement('button', {
-      className: 'btn btn--sm btn--outline', textContent: '−',
-      onClick: () => { if (this.selected.rbi > 0) { this.selected.rbi--; this.render(); } }
-    }));
-    rbiCtrl.appendChild(createElement('span', { className: 'number-control__value', textContent: this.selected.rbi }));
-    rbiCtrl.appendChild(createElement('button', {
-      className: 'btn btn--sm btn--outline', textContent: '+',
-      onClick: () => { this.selected.rbi++; this.render(); }
-    }));
-    rbiGroup.appendChild(rbiCtrl);
-    body.appendChild(rbiGroup);
-
     panel.appendChild(body);
     this.container.appendChild(panel);
   }
 
-  _submit() {
-    if (!this.selected.type) {
-      showToast('請選擇打擊結果');
-      return;
+  // ═══════════════════════════════════════════
+  // Header
+  // ═══════════════════════════════════════════
+
+  _renderHeader() {
+    const header = createElement('div', { className: 'hit-result-panel__header' });
+
+    if (this._step !== 'type') {
+      header.appendChild(createElement('button', {
+        className: 'btn btn--icon btn--sm', innerHTML: '←',
+        onClick: () => this._goBack()
+      }));
+    } else {
+      header.appendChild(createElement('button', {
+        className: 'btn btn--icon', innerHTML: '✕',
+        onClick: () => { if (this.onCancel) this.onCancel(); }
+      }));
     }
 
-    const result = createHitResult();
-    result.type = this.selected.type;
-    result.hitType = this.selected.hitType;
-    result.zone = this.selected.zone;
-    result.fieldingPath = [...this.selected.fieldingPath];
-    result.error = this.selected.error;
-    result.rbi = this.selected.rbi;
+    const STEP_LABELS = {
+      'type': '步驟 1：打擊類型',
+      'direction': '步驟 2：守備方向',
+      'result': '步驟 3：選擇結果',
+      'hit-detail': '步驟 3-1：安打詳情',
+      'out-detail': '步驟 3-2：出局詳情',
+      'error-detail': '步驟 3-3：失誤詳情',
+      'fc-detail': '步驟 3-4：野選詳情',
+      'notes': '步驟 4：備註'
+    };
+    header.appendChild(createElement('h3', { textContent: STEP_LABELS[this._step] || '打擊結果' }));
 
-    // 重置
-    this.selected = { type: null, hitType: null, zone: null, fieldingPath: [], error: false, rbi: 0, runnerEvents: [] };
+    const STEP_NUM = {
+      'type': 1, 'direction': 2, 'result': 3,
+      'hit-detail': 3, 'out-detail': 3, 'error-detail': 3, 'fc-detail': 3,
+      'notes': 4
+    };
+    header.appendChild(createElement('span', {
+      className: 'hit-result-panel__step',
+      textContent: `${STEP_NUM[this._step] || 1}/4`
+    }));
+
+    return header;
+  }
+
+  _goBack() {
+    const BACK_MAP = {
+      'direction': 'type',
+      'result': 'direction',
+      'hit-detail': 'result',
+      'out-detail': 'result',
+      'error-detail': 'result',
+      'fc-detail': 'result',
+      'notes': this._data.resultCategory ? `${this._data.resultCategory}-detail` : 'result'
+    };
+    // When going back to result step, clear result selection
+    if (this._step.endsWith('-detail') && BACK_MAP[this._step] === 'result') {
+      this._data.resultCategory = null;
+      this._data.resultType = null;
+      this._data.hitBases = null;
+    }
+    this._step = BACK_MAP[this._step] || 'type';
+    this.render();
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 1: Hit Type
+  // ═══════════════════════════════════════════
+
+  _renderTypeStep() {
+    const frag = document.createDocumentFragment();
+    frag.appendChild(createElement('div', { className: 'section-label', textContent: '選擇打擊類型' }));
+
+    const grid = createElement('div', { className: 'hit-wizard__type-grid' });
+    [
+      { val: 'G', label: '滾地', icon: '━▶' },
+      { val: 'F', label: '飛球', icon: '↗' },
+      { val: 'L', label: '平飛', icon: '─▶' }
+    ].forEach(t => {
+      const btn = createElement('button', {
+        className: `btn btn--lg ${this._data.hitType === t.val ? 'btn--primary' : 'btn--outline'}`,
+        onClick: () => {
+          Vibration.tap();
+          this._data.hitType = t.val;
+          this._step = 'direction';
+          this.render();
+        }
+      });
+      btn.innerHTML = `<span class="hit-wizard__type-icon">${t.icon}</span><span>${t.label}</span>`;
+      grid.appendChild(btn);
+    });
+    frag.appendChild(grid);
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 2: Direction / Fielding Path
+  // ═══════════════════════════════════════════
+
+  _renderDirectionStep() {
+    const frag = document.createDocumentFragment();
+    const path = this._data.fieldingPath;
+
+    if (path.length > 0) {
+      const pathDisplay = createElement('div', { className: 'hit-wizard__path-display' });
+      pathDisplay.textContent = `守備路徑: ${path.join(' - ')}`;
+      frag.appendChild(pathDisplay);
+    } else {
+      frag.appendChild(createElement('div', { className: 'section-label', textContent: '選擇球的方向（守位號碼）' }));
+    }
+
+    // 3×3 position grid
+    const grid = createElement('div', { className: 'hit-wizard__pos-grid' });
+    for (let i = 1; i <= 9; i++) {
+      const lastPos = path.length > 0 ? path[path.length - 1] : null;
+      const disabled = lastPos === i;
+      grid.appendChild(createElement('button', {
+        className: `btn btn--outline hit-wizard__pos-btn${disabled ? ' disabled' : ''}`,
+        textContent: POS_LABELS[i],
+        disabled: disabled,
+        onClick: () => { if (!disabled) { Vibration.tap(); path.push(i); this.render(); } }
+      }));
+    }
+    frag.appendChild(grid);
+
+    // Action buttons
+    const actions = createElement('div', { className: 'hit-wizard__actions' });
+    if (path.length > 0) {
+      actions.appendChild(createElement('button', {
+        className: 'btn btn--sm btn--outline', textContent: '刪除最後',
+        onClick: () => { path.pop(); this.render(); }
+      }));
+      actions.appendChild(createElement('button', {
+        className: 'btn btn--sm btn--outline', textContent: '清除全部',
+        onClick: () => { this._data.fieldingPath = []; this.render(); }
+      }));
+    }
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--primary', textContent: '下一步 →',
+      onClick: () => {
+        if (path.length === 0) { showToast('請至少選擇一個守位'); return; }
+        this._step = 'result';
+        this.render();
+      }
+    }));
+    frag.appendChild(actions);
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 3: Result Category
+  // ═══════════════════════════════════════════
+
+  _renderResultStep() {
+    const frag = document.createDocumentFragment();
+    frag.appendChild(createElement('div', { className: 'section-label', textContent: '選擇結果分類' }));
+
+    const grid = createElement('div', { className: 'hit-wizard__result-grid' });
+    const cats = [
+      { key: 'hit',   label: '安打', cls: 'btn--hit-1b' },
+      { key: 'out',   label: '出局', cls: 'btn--out' },
+      { key: 'error', label: '失誤', cls: 'btn--danger' },
+    ];
+    if (this.hasRunners) {
+      cats.push({ key: 'fc', label: '野選', cls: 'btn--other' });
+    }
+    cats.forEach(c => {
+      grid.appendChild(createElement('button', {
+        className: `btn btn--lg ${c.cls}`,
+        textContent: c.label,
+        onClick: () => {
+          Vibration.tap();
+          this._data.resultCategory = c.key;
+          this._step = `${c.key}-detail`;
+          this.render();
+        }
+      }));
+    });
+    frag.appendChild(grid);
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 3-1: Hit Detail
+  // ═══════════════════════════════════════════
+
+  _renderHitDetailStep() {
+    const frag = document.createDocumentFragment();
+    const d = this._data;
+
+    if (!d.hitBases) {
+      frag.appendChild(createElement('div', { className: 'section-label', textContent: '安打類型' }));
+      const grid = createElement('div', { className: 'hit-wizard__hit-grid' });
+      [
+        { val: 1, label: '一壘安打', cls: 'btn--hit-1b' },
+        { val: 2, label: '二壘安打', cls: 'btn--hit-2b' },
+        { val: 3, label: '三壘安打', cls: 'btn--hit-3b' },
+        { val: 4, label: '全壘打',   cls: 'btn--hit-hr' }
+      ].forEach(o => {
+        grid.appendChild(createElement('button', {
+          className: `btn btn--lg ${o.cls}`,
+          textContent: o.label,
+          onClick: () => {
+            Vibration.tap();
+            d.hitBases = o.val;
+            d.resultType = ['', '1B', '2B', '3B', 'HR'][o.val];
+            this.render();
+          }
+        }));
+      });
+      frag.appendChild(grid);
+      return frag;
+    }
+
+    // Selected type badge
+    const typeLabel = ['', '一壘安打', '二壘安打', '三壘安打', '全壘打'][d.hitBases];
+    frag.appendChild(createElement('div', { className: 'hit-wizard__selected-badge', textContent: `✓ ${typeLabel}` }));
+
+    // Follow-up questions
+    if (d.hitBases < 4) {
+      frag.appendChild(this._ynToggle('是否有額外進壘？', d.advancement, v => { d.advancement = v; this.render(); }));
+      if (d.advancement) {
+        frag.appendChild(this._choiceBtns('進壘原因', [
+          { val: 'throw', label: '趁傳' }, { val: 'error', label: '失誤' }
+        ], d.advancementReason, v => { d.advancementReason = v; this.render(); }));
+      }
+    }
+
+    frag.appendChild(this._ynToggle('是否有得分？', d.scored, v => { d.scored = v; this.render(); }));
+    if (this.hasRunners || d.scored || d.hitBases === 4) {
+      frag.appendChild(this._numberCtrl('打點 (RBI)', 'rbi'));
+    }
+
+    frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 3-2: Out Detail
+  // ═══════════════════════════════════════════
+
+  _renderOutDetailStep() {
+    const frag = document.createDocumentFragment();
+    const d = this._data;
+
+    if (!d.resultType) {
+      frag.appendChild(createElement('div', { className: 'section-label', textContent: '選擇出局類型' }));
+      const grid = createElement('div', { className: 'hit-wizard__out-grid' });
+
+      OUT_OPTIONS.forEach(o => {
+        let ok = o.compatible.includes(d.hitType);
+        // Filter DP/TP/SF/SAC based on runner count
+        const runnerCount = this._runnerCount;
+        if (o.val === 'DP' || o.val === 'SF' || o.val === 'SAC') { if (runnerCount < 1) ok = false; }
+        if (o.val === 'TP') { if (runnerCount < 2) ok = false; }
+
+        grid.appendChild(createElement('button', {
+          className: `btn btn--sm ${ok ? 'btn--out' : 'btn--outline hit-wizard__disabled'}`,
+          textContent: o.label,
+          disabled: !ok,
+          onClick: () => { if (!ok) return; Vibration.tap(); d.resultType = o.val; this.render(); }
+        }));
+      });
+      frag.appendChild(grid);
+      return frag;
+    }
+
+    const outInfo = OUT_OPTIONS.find(o => o.val === d.resultType);
+    frag.appendChild(createElement('div', { className: 'hit-wizard__selected-badge', textContent: `✓ ${outInfo?.label || d.resultType}` }));
+
+    if (this.hasRunners) {
+      frag.appendChild(this._numberCtrl('打點 (RBI)', 'rbi'));
+    }
+
+    if ((d.resultType === 'DP' || d.resultType === 'TP') && d.rbi > 0) {
+      frag.appendChild(createElement('div', { className: 'hit-wizard__warning', textContent: '⚠ 雙殺/三殺通常不計打點，請再次確認' }));
+    }
+
+    frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 3-3: Error Detail
+  // ═══════════════════════════════════════════
+
+  _renderErrorDetailStep() {
+    const frag = document.createDocumentFragment();
+    const d = this._data;
+
+    frag.appendChild(createElement('div', { className: 'section-label', textContent: '失誤守位' }));
+    const grid = createElement('div', { className: 'hit-wizard__pos-grid' });
+    for (let i = 1; i <= 9; i++) {
+      const inPath = d.fieldingPath.includes(i);
+      const selected = d.errorPosition === i;
+      grid.appendChild(createElement('button', {
+        className: `btn btn--sm ${selected ? 'btn--danger' : inPath ? 'btn--outline hit-wizard__highlight' : 'btn--outline'}`,
+        textContent: POS_LABELS[i],
+        onClick: () => { Vibration.tap(); d.errorPosition = i; d.resultType = 'E'; this.render(); }
+      }));
+    }
+    frag.appendChild(grid);
+
+    if (d.errorPosition) {
+      frag.appendChild(createElement('div', { className: 'section-label', textContent: '打者上到哪個壘包' }));
+      const baseGrid = createElement('div', { className: 'hit-wizard__base-grid' });
+      [
+        { val: 'first', label: '一壘' },
+        { val: 'second', label: '二壘' },
+        { val: 'third', label: '三壘' },
+        { val: 'home', label: '本壘(得分)' }
+      ].forEach(b => {
+        baseGrid.appendChild(createElement('button', {
+          className: `btn btn--sm ${d.baseReached === b.val ? 'btn--primary' : 'btn--outline'}`,
+          textContent: b.label,
+          onClick: () => { Vibration.tap(); d.baseReached = b.val; this.render(); }
+        }));
+      });
+      frag.appendChild(baseGrid);
+    }
+
+    if (d.errorPosition && d.baseReached) {
+      frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
+    }
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 3-4: Fielder's Choice Detail
+  // ═══════════════════════════════════════════
+
+  _renderFCDetailStep() {
+    const frag = document.createDocumentFragment();
+    const d = this._data;
+    d.resultType = 'FC';
+
+    frag.appendChild(this._ynToggle('是否有出局？', d.fcOutOccurred, v => { d.fcOutOccurred = v; this.render(); }));
+
+    if (d.fcOutOccurred) {
+      frag.appendChild(createElement('div', { className: 'section-label', textContent: '哪位跑者出局？' }));
+      const grid = createElement('div', { className: 'hit-wizard__runner-grid' });
+      [
+        { key: 'first', label: '一壘跑者' },
+        { key: 'second', label: '二壘跑者' },
+        { key: 'third', label: '三壘跑者' }
+      ].forEach(b => {
+        if (!this.runners[b.key]) return;
+        grid.appendChild(createElement('button', {
+          className: `btn btn--sm ${d.fcOutRunner === b.key ? 'btn--primary' : 'btn--outline'}`,
+          textContent: b.label,
+          onClick: () => { Vibration.tap(); d.fcOutRunner = b.key; this.render(); }
+        }));
+      });
+      frag.appendChild(grid);
+    }
+
+    frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Step 4: Notes + Confirm
+  // ═══════════════════════════════════════════
+
+  _renderNotesStep() {
+    const frag = document.createDocumentFragment();
+
+    // Summary
+    frag.appendChild(this._renderSummary());
+
+    // Notes textarea
+    frag.appendChild(createElement('div', { className: 'section-label', textContent: '備註（選填）' }));
+    const ta = createElement('textarea', {
+      className: 'hit-wizard__notes',
+      placeholder: '文字轉播、特殊判決說明...'
+    });
+    ta.value = this._data.notes;
+    ta.addEventListener('input', (e) => { this._data.notes = e.target.value; });
+    frag.appendChild(ta);
+
+    // Confirm
+    frag.appendChild(createElement('button', {
+      className: 'btn btn--primary btn--block btn--lg',
+      textContent: '確認結果 ✓',
+      style: 'margin-top: var(--space-md)',
+      onClick: () => this._submit()
+    }));
+    return frag;
+  }
+
+  _renderSummary() {
+    const d = this._data;
+    const typeMap = { G: '滾地', F: '飛球', L: '平飛' };
+    const lines = [];
+    if (d.hitType) lines.push(`打擊類型: ${typeMap[d.hitType]}`);
+    if (d.fieldingPath.length) lines.push(`守備路徑: ${d.fieldingPath.join('-')}`);
+    if (d.resultType) {
+      const info = HIT_RESULTS_INFO[d.resultType];
+      lines.push(`結果: ${info ? info.name : d.resultType}`);
+    }
+    if (d.rbi > 0) lines.push(`打點: ${d.rbi}`);
+    if (d.advancement) lines.push(`額外進壘: ${d.advancementReason === 'throw' ? '趁傳' : '失誤'}`);
+    if (d.errorPosition) lines.push(`失誤守位: ${POS_LABELS[d.errorPosition]}`);
+    if (d.baseReached) {
+      const baseNames = { first: '一壘', second: '二壘', third: '三壘', home: '本壘' };
+      lines.push(`上壘: ${baseNames[d.baseReached]}`);
+    }
+
+    const box = createElement('div', { className: 'hit-wizard__summary' });
+    box.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
+    return box;
+  }
+
+  // ═══════════════════════════════════════════
+  // Submit
+  // ═══════════════════════════════════════════
+
+  _submit() {
+    const d = this._data;
+    if (!d.resultType) { showToast('請完成所有步驟'); return; }
+
+    const result = createHitResult({
+      type: d.resultType,
+      hitType: d.hitType,
+      direction: { zone: null, subZone: null, x: null, y: null },
+      fieldingPath: d.fieldingPath.map(n => POS_NUM_MAP[n]),
+      rbi: d.rbi,
+      isError: d.resultCategory === 'error',
+      errorFielder: d.errorPosition ? POS_NUM_MAP[d.errorPosition] : null,
+      errorType: null
+    });
+
+    // Attach extra metadata for downstream use
+    result.notes = d.notes;
+    result.advancement = d.advancement;
+    result.advancementReason = d.advancementReason;
+    result.scored = d.scored;
+    result.baseReached = d.baseReached;
+    result.fcOutOccurred = d.fcOutOccurred;
+    result.fcOutRunner = d.fcOutRunner;
+
+    // Reset wizard
+    this._step = 'type';
+    this._data = this._freshData();
 
     Vibration.heavy();
     if (this.onResult) this.onResult(result);
+  }
+
+  // ═══════════════════════════════════════════
+  // Keyboard shortcuts (called by LiveRecord)
+  // ═══════════════════════════════════════════
+
+  handleKey(e) {
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    const key = e.key.toUpperCase();
+    const d = this._data;
+
+    switch (this._step) {
+      case 'type':
+        if (key === '1') { d.hitType = 'G'; this._step = 'direction'; this.render(); e.preventDefault(); }
+        else if (key === '2') { d.hitType = 'F'; this._step = 'direction'; this.render(); e.preventDefault(); }
+        else if (key === '3') { d.hitType = 'L'; this._step = 'direction'; this.render(); e.preventDefault(); }
+        else if (key === 'ESCAPE') { if (this.onCancel) this.onCancel(); e.preventDefault(); }
+        break;
+
+      case 'direction':
+        if (key >= '1' && key <= '9') {
+          const n = parseInt(key);
+          // Block consecutive same position
+          if (d.fieldingPath.length > 0 && d.fieldingPath[d.fieldingPath.length - 1] === n) {
+            e.preventDefault();
+            break;
+          }
+          d.fieldingPath.push(n); this.render(); e.preventDefault();
+        }
+        else if (key === 'ENTER' && d.fieldingPath.length > 0) { this._step = 'result'; this.render(); e.preventDefault(); }
+        else if (key === 'BACKSPACE') { d.fieldingPath.pop(); this.render(); e.preventDefault(); }
+        else if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+
+      case 'result':
+        if (key === 'H') { d.resultCategory = 'hit'; this._step = 'hit-detail'; this.render(); e.preventDefault(); }
+        else if (key === 'O') { d.resultCategory = 'out'; this._step = 'out-detail'; this.render(); e.preventDefault(); }
+        else if (key === 'E') { d.resultCategory = 'error'; this._step = 'error-detail'; this.render(); e.preventDefault(); }
+        else if (key === 'F' && this.hasRunners) { d.resultCategory = 'fc'; this._step = 'fc-detail'; this.render(); e.preventDefault(); }
+        else if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+
+      case 'hit-detail':
+        if (!d.hitBases) {
+          if (key >= '1' && key <= '4') {
+            const n = parseInt(key);
+            d.hitBases = n;
+            d.resultType = ['', '1B', '2B', '3B', 'HR'][n];
+            this.render(); e.preventDefault();
+          }
+        } else {
+          if (key === 'Y') { this._hitDetailYN(true); e.preventDefault(); }
+          else if (key === 'N') { this._hitDetailYN(false); e.preventDefault(); }
+          else if (key === 'ENTER') { this._step = 'notes'; this.render(); e.preventDefault(); }
+        }
+        if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+
+      case 'out-detail':
+        if (!d.resultType) {
+          const runnerCount = this._runnerCount;
+          const enabled = OUT_OPTIONS.filter(o => {
+            const typeOk = o.compatible.includes(d.hitType);
+            let runnerOk = true;
+            if (o.val === 'DP' || o.val === 'SF' || o.val === 'SAC') runnerOk = runnerCount >= 1;
+            if (o.val === 'TP') runnerOk = runnerCount >= 2;
+            return typeOk && runnerOk;
+          });
+          const idx = parseInt(key) - 1;
+          if (idx >= 0 && idx < enabled.length) {
+            d.resultType = enabled[idx].val;
+            this.render(); e.preventDefault();
+          }
+        } else if (key === 'ENTER') { this._step = 'notes'; this.render(); e.preventDefault(); }
+        if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+
+      case 'error-detail':
+        if (!d.errorPosition && key >= '1' && key <= '9') {
+          d.errorPosition = parseInt(key); d.resultType = 'E'; this.render(); e.preventDefault();
+        } else if (d.errorPosition && !d.baseReached) {
+          if (key === '1') { d.baseReached = 'first'; this.render(); e.preventDefault(); }
+          else if (key === '2') { d.baseReached = 'second'; this.render(); e.preventDefault(); }
+          else if (key === '3') { d.baseReached = 'third'; this.render(); e.preventDefault(); }
+          else if (key === '4') { d.baseReached = 'home'; this.render(); e.preventDefault(); }
+        } else if (d.errorPosition && d.baseReached && key === 'ENTER') {
+          this._step = 'notes'; this.render(); e.preventDefault();
+        }
+        if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+
+      case 'fc-detail':
+        if (key === 'Y') { d.fcOutOccurred = true; this.render(); e.preventDefault(); }
+        else if (key === 'N') { d.fcOutOccurred = false; this.render(); e.preventDefault(); }
+        else if (key === 'ENTER') { d.resultType = 'FC'; this._step = 'notes'; this.render(); e.preventDefault(); }
+        else if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+
+      case 'notes':
+        if (key === 'ENTER' && e.ctrlKey) { this._submit(); e.preventDefault(); }
+        else if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+    }
+  }
+
+  /** Y/N handler for hit detail: toggles scored question */
+  _hitDetailYN(val) {
+    const d = this._data;
+    // Y/N keyboard toggles the scored question (most common)
+    d.scored = val;
+    this.render();
+  }
+
+  // ═══════════════════════════════════════════
+  // Reusable UI helpers
+  // ═══════════════════════════════════════════
+
+  _ynToggle(label, value, onChange) {
+    const row = createElement('div', { className: 'hit-wizard__yn-group' });
+    row.appendChild(createElement('span', { className: 'hit-wizard__yn-label', textContent: label }));
+    const btns = createElement('div', { className: 'hit-wizard__yn-btns' });
+    btns.appendChild(createElement('button', {
+      className: `btn btn--sm ${value === true ? 'btn--primary' : 'btn--outline'}`,
+      textContent: '是', onClick: () => { Vibration.tap(); onChange(true); }
+    }));
+    btns.appendChild(createElement('button', {
+      className: `btn btn--sm ${value === false ? 'btn--primary' : 'btn--outline'}`,
+      textContent: '否', onClick: () => { Vibration.tap(); onChange(false); }
+    }));
+    row.appendChild(btns);
+    return row;
+  }
+
+  _choiceBtns(label, options, selected, onChange) {
+    const row = createElement('div', { className: 'hit-wizard__yn-group' });
+    row.appendChild(createElement('span', { className: 'hit-wizard__yn-label', textContent: label }));
+    const btns = createElement('div', { className: 'hit-wizard__yn-btns' });
+    options.forEach(o => {
+      btns.appendChild(createElement('button', {
+        className: `btn btn--sm ${selected === o.val ? 'btn--primary' : 'btn--outline'}`,
+        textContent: o.label, onClick: () => { Vibration.tap(); onChange(o.val); }
+      }));
+    });
+    row.appendChild(btns);
+    return row;
+  }
+
+  _numberCtrl(label, dataKey) {
+    const row = createElement('div', { className: 'hit-wizard__number-group' });
+    row.appendChild(createElement('label', { textContent: label }));
+    const ctrl = createElement('div', { className: 'number-control' });
+    ctrl.appendChild(createElement('button', {
+      className: 'btn btn--sm btn--outline', textContent: '−',
+      onClick: () => { if (this._data[dataKey] > 0) this._data[dataKey]--; this.render(); }
+    }));
+    ctrl.appendChild(createElement('span', { className: 'number-control__value', textContent: this._data[dataKey] }));
+    ctrl.appendChild(createElement('button', {
+      className: 'btn btn--sm btn--outline', textContent: '+',
+      onClick: () => { this._data[dataKey]++; this.render(); }
+    }));
+    row.appendChild(ctrl);
+    return row;
+  }
+
+  _nextBtn(onClick) {
+    return createElement('button', {
+      className: 'btn btn--primary btn--block',
+      textContent: '下一步 →',
+      style: 'margin-top: var(--space-md)',
+      onClick
+    });
+  }
+
+  /** Runner count helper */
+  get _runnerCount() {
+    return [this.runners.first, this.runners.second, this.runners.third]
+      .filter(Boolean).length;
   }
 }

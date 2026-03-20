@@ -38,6 +38,15 @@ export class Router {
     window.location.hash = hash;
   }
 
+  /** 回到上一頁（若無歷史則回首頁） */
+  back() {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      this.navigate('#/');
+    }
+  }
+
   _onHashChange() {
     const hash = window.location.hash || '#/';
     for (const route of this.routes) {
