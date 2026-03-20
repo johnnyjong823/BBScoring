@@ -76,13 +76,6 @@
     grid-template-columns: repeat(4, 1fr);
   }
 
-  .count-display {
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-lg);
-  }
-
   .runner-diagram {
     width: 180px;
     height: 180px;

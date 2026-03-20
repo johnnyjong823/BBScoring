@@ -78,6 +78,46 @@ export class RunnerManager {
     this.state.runners[base] = null;
   }
 
+  /**
+   * 自訂推進跑者 (WP/PB/BK 時由 UI 指定每位跑者前進幾個壘包)
+   * @param {Array} advances - [{from:'first', bases:1}, {from:'second', bases:2}, ...]
+   *   bases = 0 means no advance, 1=one base, 2=two bases, 3=score from first, etc.
+   * @param {string} event - 'WP', 'PB', 'BK'
+   * @returns {{ movements: Array, runs: number }}
+   */
+  applyCustomAdvancement(advances, event) {
+    const BASE_ORDER = ['first', 'second', 'third', 'home'];
+    const movements = [];
+    let runs = 0;
+
+    // Process from third→first to avoid conflicts
+    const sorted = [...advances].sort((a, b) =>
+      BASE_ORDER.indexOf(b.from) - BASE_ORDER.indexOf(a.from)
+    );
+
+    for (const { from, bases } of sorted) {
+      if (bases <= 0) continue;
+      const runnerId = this.state.runners[from];
+      if (!runnerId) continue;
+
+      const fromIdx = BASE_ORDER.indexOf(from);
+      const toIdx = Math.min(fromIdx + bases, 3); // cap at home
+      const to = BASE_ORDER[toIdx];
+      const scored = to === 'home';
+
+      this.state.runners[from] = null;
+      if (!scored) this.state.runners[to] = runnerId;
+
+      movements.push({
+        runnerId, from, to, event,
+        scored,
+        earnedRun: scored && event !== 'ERROR'
+      });
+      if (scored) runs++;
+    }
+    return { movements, runs };
+  }
+
   hasRunners() {
     return !!(this.state.runners.first || this.state.runners.second || this.state.runners.third);
   }

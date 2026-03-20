@@ -3,6 +3,7 @@
  */
 import { createElement } from '../utils/helpers.js';
 import { StatsCalculator } from '../core/StatsCalculator.js';
+import { GestureHandler } from '../utils/gestures.js';
 
 export class StatsView {
   constructor({ container, game, onBack }) {
@@ -23,11 +24,18 @@ export class StatsView {
     // Header
     const header = createElement('div', { className: 'stats-view__header' });
     header.appendChild(createElement('button', {
-      className: 'btn btn--icon', innerHTML: '◀',
+      className: 'btn btn--icon', innerHTML: '←', // Unified back icon
       onClick: () => { if (this.onBack) this.onBack(); }
     }));
     header.appendChild(createElement('h3', { textContent: '數據統計' }));
     wrapper.appendChild(header);
+
+    // Swipe to go back
+    new GestureHandler(wrapper).el.addEventListener('swipe', (e) => {
+      if (e.detail.direction === 'right' && this.onBack) {
+        this.onBack();
+      }
+    });
 
     // Tab: 打擊 / 投球
     const tabs = createElement('div', { className: 'stats-view__tabs' });
@@ -142,7 +150,7 @@ export class StatsView {
       if (!player) return;
 
       const pitcherData = this._getPitcherData(game, oppSide, pid);
-      const stats = StatsCalculator.calcPitcherStats(pitcherData);
+      const stats = StatsCalculator.calcPitcherStats(pitcherData.atBats);
 
       const tr = createElement('tr');
       tr.innerHTML = `

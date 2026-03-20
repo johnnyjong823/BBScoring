@@ -1,0 +1,9 @@
+#!/bin/bash
+# BBScoring - subagentStart hook
+# 在子代理啟動時注入專案規範，確保子代理了解本專案的技術約束
+
+cat << 'CONTEXT_EOF'
+{
+  "injectContext": "## BBScoring 專案規範（子代理必讀）\n\n### 技術棧\n- 純 vanilla JavaScript (ES6+)，不使用任何框架（React、Vue、Angular 等）\n- 使用 ES Module（import/export），禁止使用 CommonJS（require）\n- 無 npm、無 package.json、無 node_modules、無任何 build 工具或 bundler\n- 無測試框架，無 linter 設定\n\n### 架構\n- 單頁應用（SPA），入口為 src/index.html，主程式為 src/js/app.js\n- 目錄結構：src/js/models/（資料模型）、src/js/core/（核心邏輯）、src/js/ui/（UI 元件）、src/js/storage/（儲存層）、src/js/utils/（工具函式）\n- Hash-based 路由（#/home、#/live/:id、#/stats/:id 等）\n- 自訂事件系統（GameEngine 中的 on/off/emit）\n\n### 資料儲存\n- LocalStorage：存放進行中的比賽和使用者設定\n- IndexedDB：存放已完成的比賽紀錄和錦標賽資料\n- 離線優先 PWA（Service Worker + manifest.json）\n\n### UI / 樣式\n- 介面語言為繁體中文（zh-TW）\n- CSS Variables 做深色/淺色主題切換\n- Mobile-first 響應式設計，主要在平板和手機上使用\n- CSS 分為多個模組檔案（reset、variables、base、layout、components 等）\n\n### 注意事項\n- 不要建議安裝任何 npm 套件\n- 不要產生 TypeScript 程式碼\n- 不要建議引入框架或 bundler\n- 所有新程式碼必須與現有的 ES Module 架構一致"
+}
+CONTEXT_EOF

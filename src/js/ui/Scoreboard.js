@@ -94,7 +94,7 @@ export class Scoreboard {
       const half = side === 'away' ? inn.top : inn.bottom;
       if (half && half.atBats) {
         half.atBats.forEach(ab => {
-          if (ab.hitResult && this._isHit(ab.hitResult.result)) hits++;
+          if (ab.result && this._isHit(ab.result.type)) hits++;
         });
       }
     });
@@ -111,7 +111,7 @@ export class Scoreboard {
       const half = side === 'away' ? inn.top : inn.bottom;
       if (half && half.atBats) {
         half.atBats.forEach(ab => {
-          if (ab.hitResult && ab.hitResult.error) errors++;
+          if (ab.result && ab.result.isError) errors++;
         });
       }
     });

@@ -3,7 +3,7 @@
  */
 import { generateId, getTimestamp, getTodayStr, getNowTimeStr } from '../utils/helpers.js';
 import { createInning } from './Inning.js';
-import { GAME_STATUS, HALF_INNING } from '../utils/constants.js';
+import { GAME_STATUS, HALF_INNING, START_MODE, RECORDING_MODE, DATA_VERSION } from '../utils/constants.js';
 
 export function createGame({
   name = '',
@@ -11,7 +11,9 @@ export function createGame({
   time = '',
   venue = '',
   totalInnings = 9,
-  notes = ''
+  notes = '',
+  startMode = START_MODE.QUICK,
+  recordingMode = RECORDING_MODE.DETAILED
 } = {}) {
   const id = generateId('game');
   const now = getTimestamp();
@@ -24,9 +26,18 @@ export function createGame({
 
   return {
     id,
-    version: 1,
+    version: DATA_VERSION,
     createdAt: now,
     updatedAt: now,
+
+    mode: {
+      startMode,
+      recordingMode
+    },
+
+    // 聯賽關聯 (Tournament 模式用)
+    tournamentId: null,
+    matchId: null,
 
     info: {
       date: date || getTodayStr(),
@@ -70,6 +81,10 @@ export function createGame({
         home: 0
       }
     },
+
+    // 投手自責分確認記錄
+    earnedRunConfirmations: {},
+    // { [pitcherId]: [{ inning, halfInning, runnerId, isEarnedRun: true }] }
 
     history: [],
     historyIndex: -1

@@ -2,6 +2,11 @@
  * BBScoring — Service Worker (Cache First)
  */
 const CACHE_NAME = 'bbscoring-v1';
+const LOCALHOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+function isLocalhost() {
+  return LOCALHOSTS.has(self.location.hostname);
+}
 
 const PRECACHE_URLS = [
   './',
@@ -50,6 +55,11 @@ const PRECACHE_URLS = [
 
 // Install — 預快取所有資源
 self.addEventListener('install', (event) => {
+  if (isLocalhost()) {
+    self.skipWaiting();
+    return;
+  }
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
   );
@@ -58,6 +68,15 @@ self.addEventListener('install', (event) => {
 
 // Activate — 清除舊版快取
 self.addEventListener('activate', (event) => {
+  if (isLocalhost()) {
+    event.waitUntil(
+      caches.keys()
+        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then(() => self.registration.unregister())
+    );
+    return;
+  }
+
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
@@ -68,6 +87,8 @@ self.addEventListener('activate', (event) => {
 
 // Fetch — Cache First 策略
 self.addEventListener('fetch', (event) => {
+  if (isLocalhost()) return;
+
   // 只攔截 GET 請求
   if (event.request.method !== 'GET') return;
 

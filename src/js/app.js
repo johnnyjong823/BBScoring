@@ -1,5 +1,7 @@
 /**
  * BBScoring — App 入口 (主應用程式控制器)
+ *
+ * v2: Supports 2×2 mode matrix (Quick/Tournament × Result-Only/Detailed)
  */
 import { Router } from './router.js';
 import { StorageManager } from './storage/StorageManager.js';
@@ -7,11 +9,17 @@ import { ExportManager } from './storage/ExportManager.js';
 import { ImportManager } from './storage/ImportManager.js';
 import { GameEngine } from './core/GameEngine.js';
 import { GameSetup } from './ui/GameSetup.js';
+import { QuickSetup } from './ui/QuickSetup.js';
+import { HomeView } from './ui/HomeView.js';
+import { AuthView } from './ui/AuthView.js';
 import { LiveRecord } from './ui/LiveRecord.js';
 import { StatsView } from './ui/StatsView.js';
 import { HistoryPanel } from './ui/HistoryPanel.js';
+import { createGame } from './models/Game.js';
+import { createTeam } from './models/Team.js';
+import { createPlayer } from './models/Player.js';
 import { createElement, showToast, showConfirm, formatDate, formatTime } from './utils/helpers.js';
-import { GAME_STATUS, DEFAULT_SETTINGS } from './utils/constants.js';
+import { GAME_STATUS, DEFAULT_SETTINGS, START_MODE, RECORDING_MODE } from './utils/constants.js';
 
 class App {
   constructor() {
@@ -19,11 +27,12 @@ class App {
     this.storage = new StorageManager();
     this.engine = null;
     this.container = null;
+    this.authSession = null;
     this.settings = { ...DEFAULT_SETTINGS };
   }
 
-  /** 初始化應用程式 */
-  init() {
+  /** 初始化應用程式（含 async IndexedDB + 資料遷移） */
+  async init() {
     this.container = document.getElementById('app');
     if (!this.container) {
       this.container = document.createElement('div');
@@ -36,15 +45,25 @@ class App {
     if (savedSettings) Object.assign(this.settings, savedSettings);
     this._applyTheme();
 
+    // 初始化 StorageManager（IndexedDB + 資料遷移）
+    try {
+      await this.storage.init();
+    } catch (e) {
+      console.warn('Storage init warning:', e);
+    }
+
     // 設定路由
     this.router
-      .add('#/', () => this._renderHome())
-      .add('#/setup', () => this._renderSetup())
-      .add('#/setup/:id', (p) => this._renderSetup(p.id))
-      .add('#/live/:id', (p) => this._renderLive(p.id))
-      .add('#/stats/:id', (p) => this._renderStats(p.id))
-      .add('#/history/:id', (p) => this._renderHistory(p.id))
-      .add('#/settings', () => this._renderSettings());
+      .add('#/', () => this._renderEntry())
+      .add('#/auth', () => this._renderAuth())
+      .add('#/quick-setup', () => this._ensureAuth() && this._renderQuickSetup())
+      .add('#/setup', () => this._ensureAuth() && this._renderSetup())
+      .add('#/setup/:id', (p) => this._ensureAuth() && this._renderSetup(p.id))
+      .add('#/live/:id', (p) => this._ensureAuth() && this._renderLive(p.id))
+      .add('#/stats/:id', (p) => this._ensureAuth() && this._renderStats(p.id))
+      .add('#/history/:id', (p) => this._ensureAuth() && this._renderHistory(p.id))
+      .add('#/tournament', () => this._ensureAuth() && this._renderTournamentList())
+      .add('#/settings', () => this._ensureAuth() && this._renderSettings());
 
     this.router.start();
 
@@ -56,123 +75,126 @@ class App {
   // 頁面渲染
   // ==================
 
-  _renderHome() {
-    this.container.innerHTML = '';
-    const page = createElement('div', { className: 'home-layout' });
-
-    // Header
-    const header = createElement('header', { className: 'home-layout__header' });
-    header.innerHTML = `<h1 class="home-layout__title">⚾ BBScoring</h1>
-      <p class="home-layout__subtitle">棒球計分助手</p>`;
-    page.appendChild(header);
-
-    // 操作區
-    const actions = createElement('div', { className: 'home-layout__actions' });
-    actions.appendChild(createElement('button', {
-      className: 'btn btn--primary btn--lg btn--block',
-      textContent: '🆕 開始新比賽',
-      onClick: () => this.router.navigate('#/setup')
-    }));
-    page.appendChild(actions);
-
-    // 比賽列表
-    const games = this.storage.loadAllGames();
-    if (games.length > 0) {
-      page.appendChild(createElement('h3', {
-        className: 'home-layout__section-title',
-        textContent: '比賽記錄'
-      }));
-
-      const list = createElement('div', { className: 'home-layout__list' });
-      games.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-
-      games.forEach(game => {
-        const card = createElement('div', { className: 'game-card' });
-        const statusLabel = this._getStatusLabel(game.info.status);
-        const dateStr = game.info.date || '';
-        card.innerHTML = `
-          <div class="game-card__header">
-            <span class="game-card__name">${game.info.name || '未命名比賽'}</span>
-            <span class="game-card__badge game-card__badge--${game.info.status}">${statusLabel}</span>
-          </div>
-          <div class="game-card__body">
-            <div class="game-card__teams">
-              <span>${game.teams?.away?.name || '客隊'}</span>
-              <span class="game-card__score">${game.currentState?.score?.away ?? 0} - ${game.currentState?.score?.home ?? 0}</span>
-              <span>${game.teams?.home?.name || '主隊'}</span>
-            </div>
-            <div class="game-card__meta">${dateStr} ${game.info.venue || ''}</div>
-          </div>
-        `;
-
-        // 操作按鈕
-        const footer = createElement('div', { className: 'game-card__footer' });
-        if (game.info.status === GAME_STATUS.IN_PROGRESS) {
-          footer.appendChild(createElement('button', {
-            className: 'btn btn--primary btn--sm',
-            textContent: '繼續記錄',
-            onClick: (e) => { e.stopPropagation(); this.router.navigate(`#/live/${game.id}`); }
-          }));
-        }
-        footer.appendChild(createElement('button', {
-          className: 'btn btn--outline btn--sm',
-          textContent: '數據',
-          onClick: (e) => { e.stopPropagation(); this.router.navigate(`#/stats/${game.id}`); }
-        }));
-        footer.appendChild(createElement('button', {
-          className: 'btn btn--outline btn--sm',
-          textContent: '記錄',
-          onClick: (e) => { e.stopPropagation(); this.router.navigate(`#/history/${game.id}`); }
-        }));
-        footer.appendChild(createElement('button', {
-          className: 'btn btn--outline btn--sm',
-          textContent: '匯出',
-          onClick: (e) => { e.stopPropagation(); ExportManager.exportJSON(game); }
-        }));
-        footer.appendChild(createElement('button', {
-          className: 'btn btn--danger btn--sm',
-          textContent: '刪除',
-          onClick: async (e) => {
-            e.stopPropagation();
-            const ok = await showConfirm('確定要刪除此比賽嗎？此操作無法復原。');
-            if (ok) { this.storage.deleteGame(game.id); this._renderHome(); }
-          }
-        }));
-
-        card.appendChild(footer);
-        list.appendChild(card);
-      });
-
-      page.appendChild(list);
-    } else {
-      page.appendChild(createElement('p', {
-        className: 'home-layout__empty text-secondary',
-        textContent: '尚無比賽記錄，點擊上方按鈕開始新比賽！'
-      }));
+  _renderEntry() {
+    if (this._ensureAuth(false)) {
+      this._renderHome();
+      return;
     }
+    this.router.navigate('#/auth');
+  }
 
-    // 底部功能
-    const bottomActions = createElement('div', { className: 'home-layout__bottom' });
-    bottomActions.appendChild(createElement('button', {
-      className: 'btn btn--outline btn--sm',
-      textContent: '⚙ 設定',
-      onClick: () => this.router.navigate('#/settings')
-    }));
-    bottomActions.appendChild(createElement('button', {
-      className: 'btn btn--outline btn--sm',
-      textContent: '📥 匯入比賽',
-      onClick: async () => {
-        const game = await ImportManager.importJSON();
-        if (game) {
-          this.storage.saveGameImmediate(game);
-          showToast('匯入成功');
-          this._renderHome();
-        }
+  _renderAuth() {
+    const auth = new AuthView({
+      container: this.container,
+      storage: this.storage,
+      onEnter: (session) => {
+        this.storage.saveAuthSession(session);
+        this.authSession = session;
+        showToast(`${session.title} 已就緒`);
+        this.router.navigate('#/');
       }
-    }));
-    page.appendChild(bottomActions);
+    });
+    auth.render();
+  }
 
-    this.container.appendChild(page);
+  _renderHome() {
+    this.authSession = this.storage.getAuthSession();
+    const home = new HomeView({
+      container: this.container,
+      storage: this.storage,
+      authSession: this.authSession,
+      onStartTestGame: (recordingMode) => this._startMockGame(recordingMode),
+      onLogout: () => {
+        this.storage.clearAuthSession();
+        this.authSession = null;
+        showToast('已登出');
+        this.router.navigate('#/auth');
+      },
+      navigate: (hash) => this.router.navigate(hash)
+    });
+    home.render();
+  }
+
+  _renderQuickSetup() {
+    const setup = new QuickSetup({
+      container: this.container,
+      onComplete: (game) => {
+        game.info.status = GAME_STATUS.IN_PROGRESS;
+        this.storage.saveGameImmediate(game);
+        showToast('比賽建立成功！');
+        this.router.navigate(`#/live/${game.id}`);
+      },
+      onCancel: () => this.router.navigate('#/')
+    });
+    setup.render();
+  }
+
+  _startMockGame(recordingMode) {
+    const game = this._createMockGame(recordingMode);
+    game.info.status = GAME_STATUS.IN_PROGRESS;
+    this.storage.saveGameImmediate(game);
+    showToast(recordingMode === RECORDING_MODE.DETAILED ? '已建立詳細記錄測試場次' : '已建立僅記結果測試場次');
+    this.router.navigate(`#/live/${game.id}`);
+  }
+
+  _createMockGame(recordingMode) {
+    const awayTeam = this._createMockTeam('away');
+    const homeTeam = this._createMockTeam('home');
+
+    const game = createGame({
+      name: `${awayTeam.name} vs ${homeTeam.name}`,
+      venue: '測試模式球場',
+      totalInnings: 7,
+      startMode: START_MODE.QUICK,
+      recordingMode
+    });
+
+    game.teams.away = awayTeam;
+    game.teams.home = homeTeam;
+    game.lineups.away = this._createMockLineup(awayTeam);
+    game.lineups.home = this._createMockLineup(homeTeam);
+
+    return game;
+  }
+
+  _createMockTeam(side) {
+    const prefixes = side === 'away'
+      ? ['北城', '海風', '雷霆', '銀河', '赤焰']
+      : ['南港', '山岳', '疾風', '流星', '藍海'];
+    const suffixes = ['獵鷹', '猛虎', '戰狼', '飛馬', '巨人'];
+    const seed = Math.floor(Math.random() * prefixes.length);
+    const team = createTeam({
+      name: `${prefixes[seed]}${suffixes[Math.floor(Math.random() * suffixes.length)]}`,
+      color: side === 'away' ? '#c0392b' : '#2980b9'
+    });
+
+    const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'P'];
+    const baseNumber = side === 'away' ? 1 : 31;
+    team.players = positions.map((position, index) => createPlayer({
+      number: String(baseNumber + index).padStart(2, '0'),
+      name: `${side === 'away' ? '客隊' : '主隊'}球員${index + 1}`,
+      position: [position],
+      isTemporary: true
+    }));
+
+    return team;
+  }
+
+  _createMockLineup(team) {
+    const starters = team.players.map((player, index) => ({
+      order: index + 1,
+      playerId: player.id,
+      position: player.position[0] || '',
+      isActive: true
+    }));
+    const pitcher = team.players.find(player => player.position.includes('P')) || team.players[0];
+
+    return {
+      teamId: team.id,
+      starters,
+      pitcher: { playerId: pitcher.id, isActive: true },
+      substitutions: []
+    };
   }
 
   _renderSetup(gameId) {
@@ -189,8 +211,8 @@ class App {
     setup.render();
   }
 
-  _renderLive(gameId) {
-    const gameData = this.storage.loadGame(gameId);
+  async _renderLive(gameId) {
+    const gameData = await this.storage.loadGameAsync(gameId);
     if (!gameData) {
       showToast('找不到此比賽');
       this.router.navigate('#/');
@@ -223,8 +245,8 @@ class App {
     live.render();
   }
 
-  _renderStats(gameId) {
-    const gameData = this.storage.loadGame(gameId);
+  async _renderStats(gameId) {
+    const gameData = await this.storage.loadGameAsync(gameId);
     if (!gameData) {
       showToast('找不到此比賽');
       this.router.navigate('#/');
@@ -245,8 +267,8 @@ class App {
     stats.render();
   }
 
-  _renderHistory(gameId) {
-    const gameData = this.storage.loadGame(gameId);
+  async _renderHistory(gameId) {
+    const gameData = await this.storage.loadGameAsync(gameId);
     if (!gameData) {
       showToast('找不到此比賽');
       this.router.navigate('#/');
@@ -360,7 +382,7 @@ class App {
     const aboutSection = createElement('div', { className: 'settings-section' });
     aboutSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '關於' }));
     aboutSection.innerHTML += `
-      <div class="text-secondary">BBScoring v1.0.0</div>
+      <div class="text-secondary">BBScoring v2.0.0</div>
       <div class="text-secondary">棒球計分助手 — 離線可用的 PWA 應用程式</div>
     `;
     body.appendChild(aboutSection);
@@ -369,9 +391,41 @@ class App {
     this.container.appendChild(page);
   }
 
+  _renderTournamentList() {
+    this.container.innerHTML = '';
+    const page = createElement('div', 'tournament-page');
+
+    const header = createElement('div', 'tournament-page__header');
+    header.appendChild(createElement('button', {
+      className: 'btn btn--icon', innerHTML: '◀',
+      onClick: () => this.router.navigate('#/')
+    }));
+    header.appendChild(createElement('h3', { textContent: '🏆 聯賽 / 盃賽' }));
+    page.appendChild(header);
+
+    const body = createElement('div', 'tournament-page__body scrollable');
+    body.innerHTML = `
+      <div class="home-view__empty">
+        <p class="home-view__empty-icon">🏗️</p>
+        <p class="home-view__empty-text">聯賽功能開發中</p>
+        <p class="home-view__empty-hint">Phase 3 將實作聯賽管理功能</p>
+      </div>
+    `;
+    page.appendChild(body);
+
+    this.container.appendChild(page);
+  }
+
   // ==================
   // 工具方法
   // ==================
+
+  _ensureAuth(redirect = true) {
+    this.authSession = this.storage.getAuthSession();
+    if (this.authSession) return true;
+    if (redirect) this.router.navigate('#/auth');
+    return false;
+  }
 
   _getStatusLabel(status) {
     const labels = {
@@ -391,11 +445,22 @@ class App {
   }
 
   _registerSW() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {
-        // SW registration failed — offline mode unavailable
+    if (!('serviceWorker' in navigator)) return;
+
+    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+
+    if (isLocalhost) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => registration.unregister());
+      }).catch(() => {
+        // Ignore localhost cleanup failure
       });
+      return;
     }
+
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      // SW registration failed — offline mode unavailable
+    });
   }
 }
 

@@ -427,10 +427,14 @@ export class LiveRecord {
     if (runners.third) candidates.push({ base: 'third', to: 'home', player: runnersInfo.third, id: runners.third });
 
     if (candidates.length === 0) { showToast('壘上無跑者'); return; }
-    this._showStealWizard(candidates);
+
+    // Filter out runners whose target base is occupied by a non-stealing runner
+    // For single steals: can only steal if target base is empty
+    // For multiple steals: both stealing = ok (chain steal)
+    this._showStealWizard(candidates, runners);
   }
 
-  _showStealWizard(candidates) {
+  _showStealWizard(candidates, runners) {
     const overlay = createElement('div', { className: 'modal-overlay active' });
     const modal = createElement('div', { className: 'modal' });
 
@@ -439,6 +443,18 @@ export class LiveRecord {
     const results = {};
     const baseLabel = { first: '一壘', second: '二壘', third: '三壘' };
     const toLabel = { second: '二壘', third: '三壘', home: '本壘' };
+
+    // Validate steal selection: a runner can only steal if target is empty or the occupant is also selected
+    const isValidSelection = (sel) => {
+      const targetMap = { first: 'second', second: 'third', third: 'home' };
+      const occupiedBases = { first: !!runners.first, second: !!runners.second, third: !!runners.third };
+      for (const base of sel) {
+        const target = targetMap[base];
+        if (target === 'home') continue; // home is always available
+        if (occupiedBases[target] && !sel.includes(target)) return false;
+      }
+      return true;
+    };
 
     const draw = () => {
       modal.innerHTML = '';
@@ -449,13 +465,45 @@ export class LiveRecord {
 
       if (step === 'select') {
         body.appendChild(createElement('div', { className: 'section-label', textContent: '選擇盜壘跑者' }));
+
+        // Auto-fix selection: when toggling ON a runner, also select runners blocking the path
+        const autoFixSelection = (sel) => {
+          const targetMap = { first: 'second', second: 'third', third: 'home' };
+          const occupiedBases = { first: !!runners.first, second: !!runners.second, third: !!runners.third };
+          let changed = true;
+          while (changed) {
+            changed = false;
+            for (const base of sel) {
+              const target = targetMap[base];
+              if (target !== 'home' && occupiedBases[target] && !sel.includes(target)) {
+                sel.push(target);
+                changed = true;
+              }
+            }
+          }
+          return sel;
+        };
+
         candidates.forEach(c => {
           const on = selected.includes(c.base);
           const btn = createElement('button', {
             className: `btn btn--block ${on ? 'btn--primary' : 'btn--outline'}`,
             textContent: `${baseLabel[c.base]} → ${toLabel[c.to]}  ${c.player?.name || '#' + (c.player?.number || '?')}`,
             style: 'margin-bottom:var(--space-sm)',
-            onClick: () => { on ? (selected = selected.filter(b => b !== c.base)) : selected.push(c.base); draw(); }
+            onClick: () => {
+              if (on) {
+                selected = selected.filter(b => b !== c.base);
+                // Re-validate: removing this runner may break the chain for others
+                if (!isValidSelection(selected)) {
+                  // Remove runners that depend on the removed one
+                  selected = selected.filter(b => isValidSelection([b]));
+                }
+              } else {
+                selected.push(c.base);
+                selected = autoFixSelection(selected);
+              }
+              draw();
+            }
           });
           body.appendChild(btn);
         });
@@ -468,7 +516,7 @@ export class LiveRecord {
             onClick: () => { selected = candidates.map(c => c.base); draw(); }
           }));
         }
-        if (selected.length > 0) {
+        if (selected.length > 0 && isValidSelection(selected)) {
           body.appendChild(createElement('button', {
             className: 'btn btn--primary btn--block',
             textContent: '下一步 →',
@@ -828,7 +876,10 @@ export class LiveRecord {
   _hideHitPanel() {
     const panel = this.container.querySelector('#hit-panel');
     if (panel) panel.classList.remove('open');
-    // Always re-render to reflect new state after hit result
+    // Cancel the IP pitch: undo to restore state before the ball was put in play
+    if (this.engine.game.currentState.waitingForHitResult) {
+      this.engine.undo();
+    }
     this._updateDisplay();
   }
 

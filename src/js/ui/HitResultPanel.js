@@ -363,17 +363,39 @@ export class HitResultPanel {
     const d = this._data;
 
     frag.appendChild(createElement('div', { className: 'section-label', textContent: '失誤守位' }));
+
+    // Show fielding path positions first (prominent)
+    const pathPositions = d.fieldingPath.length > 0 ? d.fieldingPath : [1,2,3,4,5,6,7,8,9];
     const grid = createElement('div', { className: 'hit-wizard__pos-grid' });
-    for (let i = 1; i <= 9; i++) {
-      const inPath = d.fieldingPath.includes(i);
+    pathPositions.forEach(i => {
       const selected = d.errorPosition === i;
       grid.appendChild(createElement('button', {
-        className: `btn btn--sm ${selected ? 'btn--danger' : inPath ? 'btn--outline hit-wizard__highlight' : 'btn--outline'}`,
+        className: `btn btn--sm ${selected ? 'btn--danger' : 'btn--outline hit-wizard__highlight'}`,
         textContent: POS_LABELS[i],
         onClick: () => { Vibration.tap(); d.errorPosition = i; d.resultType = 'E'; this.render(); }
       }));
-    }
+    });
     frag.appendChild(grid);
+
+    // Show remaining positions (smaller, less prominent)
+    const otherPositions = [];
+    for (let i = 1; i <= 9; i++) {
+      if (!pathPositions.includes(i)) otherPositions.push(i);
+    }
+    if (otherPositions.length > 0) {
+      frag.appendChild(createElement('div', { className: 'section-label', textContent: '其他守位', style: 'margin-top:var(--space-sm);opacity:0.6' }));
+      const grid2 = createElement('div', { className: 'hit-wizard__pos-grid' });
+      otherPositions.forEach(i => {
+        const selected = d.errorPosition === i;
+        grid2.appendChild(createElement('button', {
+          className: `btn btn--sm ${selected ? 'btn--danger' : 'btn--outline'}`,
+          textContent: POS_LABELS[i],
+          style: 'opacity:0.5',
+          onClick: () => { Vibration.tap(); d.errorPosition = i; d.resultType = 'E'; this.render(); }
+        }));
+      });
+      frag.appendChild(grid2);
+    }
 
     if (d.errorPosition) {
       frag.appendChild(createElement('div', { className: 'section-label', textContent: '打者上到哪個壘包' }));
@@ -524,23 +546,23 @@ export class HitResultPanel {
   /** Get valid destinations for a person given their starting base */
   _getDestOptions(fromBase) {
     const all = [
-      { val: 'out', label: '出局', cls: 'btn--danger' }
+      { val: 'out', label: '出局', cls: 'btn--outline', activeCls: 'btn--danger' }
     ];
     if (fromBase === 'home') {
       // Batter
-      all.push({ val: 'first', label: '一壘', cls: 'btn--outline' });
-      all.push({ val: 'second', label: '二壘', cls: 'btn--outline' });
-      all.push({ val: 'third', label: '三壘', cls: 'btn--outline' });
-      all.push({ val: 'home', label: '得分', cls: 'btn--hit-hr' });
+      all.push({ val: 'first', label: '一壘', cls: 'btn--outline', activeCls: 'btn--primary' });
+      all.push({ val: 'second', label: '二壘', cls: 'btn--outline', activeCls: 'btn--primary' });
+      all.push({ val: 'third', label: '三壘', cls: 'btn--outline', activeCls: 'btn--primary' });
+      all.push({ val: 'home', label: '得分', cls: 'btn--outline', activeCls: 'btn--hit-hr' });
     } else {
       // Runner on base — can stay, advance, or be out
       const baseNames = { first: '一壘', second: '二壘', third: '三壘', home: '得分' };
       const order = ['first', 'second', 'third', 'home'];
       const idx = order.indexOf(fromBase);
-      all.push({ val: 'stay', label: `留${baseNames[fromBase]}`, cls: 'btn--outline' });
+      all.push({ val: 'stay', label: `留${baseNames[fromBase]}`, cls: 'btn--outline', activeCls: 'btn--primary' });
       for (let i = idx + 1; i < order.length; i++) {
         const isScore = order[i] === 'home';
-        all.push({ val: order[i], label: isScore ? '得分' : baseNames[order[i]], cls: isScore ? 'btn--hit-hr' : 'btn--outline' });
+        all.push({ val: order[i], label: isScore ? '得分' : baseNames[order[i]], cls: 'btn--outline', activeCls: isScore ? 'btn--hit-hr' : 'btn--primary' });
       }
     }
     return all;
@@ -574,7 +596,7 @@ export class HitResultPanel {
       this._getDestOptions(base).forEach(opt => {
         const selected = outcomes[base].dest === opt.val;
         btns.appendChild(createElement('button', {
-          className: `btn btn--sm ${selected ? (opt.val === 'out' ? 'btn--danger' : opt.val === 'home' ? 'btn--hit-hr' : 'btn--primary') : opt.cls}`,
+          className: `btn btn--sm ${selected ? opt.activeCls : opt.cls}`,
           textContent: opt.label,
           onClick: () => { Vibration.tap(); outcomes[base].dest = opt.val; this.render(); }
         }));
@@ -593,7 +615,7 @@ export class HitResultPanel {
       this._getDestOptions('home').forEach(opt => {
         const selected = outcomes.batter.dest === opt.val;
         btns.appendChild(createElement('button', {
-          className: `btn btn--sm ${selected ? (opt.val === 'out' ? 'btn--danger' : opt.val === 'home' ? 'btn--hit-hr' : 'btn--primary') : opt.cls}`,
+          className: `btn btn--sm ${selected ? opt.activeCls : opt.cls}`,
           textContent: opt.label,
           onClick: () => { Vibration.tap(); outcomes.batter.dest = opt.val; this.render(); }
         }));
@@ -959,12 +981,13 @@ export class HitResultPanel {
   }
 
   _nextBtn(onClick) {
-    return createElement('button', {
-      className: 'btn btn--primary btn--block',
+    const wrapper = createElement('div', { style: 'display:flex;justify-content:flex-end;margin-top:var(--space-md)' });
+    wrapper.appendChild(createElement('button', {
+      className: 'btn btn--primary',
       textContent: '下一步 →',
-      style: 'margin-top: var(--space-md)',
       onClick
-    });
+    }));
+    return wrapper;
   }
 
   /** Runner count helper */

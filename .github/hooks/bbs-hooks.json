@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "subagentStart": [
+      {
+        "type": "command",
+        "powershell": "./.github/hooks/inject-context.ps1",
+        "bash": "./.github/hooks/inject-context.sh",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

@@ -158,6 +158,38 @@ export const GAME_STATUS = {
   SUSPENDED:   'SUSPENDED'
 };
 
+// 開始模式
+export const START_MODE = {
+  QUICK:      'QUICK',
+  TOURNAMENT: 'TOURNAMENT'
+};
+
+// 記錄模式
+export const RECORDING_MODE = {
+  RESULT_ONLY: 'RESULT_ONLY',
+  DETAILED:    'DETAILED'
+};
+
+// 聯賽類型
+export const TOURNAMENT_TYPE = {
+  LEAGUE:     'LEAGUE',
+  TOURNAMENT: 'TOURNAMENT',
+  FRIENDLY:   'FRIENDLY'
+};
+
+// 聯賽狀態
+export const TOURNAMENT_STATUS = {
+  ACTIVE:    'ACTIVE',
+  COMPLETED: 'COMPLETED'
+};
+
+// 場次狀態
+export const MATCH_STATUS = {
+  SCHEDULED:   'SCHEDULED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED:   'COMPLETED'
+};
+
 // 半局
 export const HALF_INNING = {
   TOP:    'TOP',
@@ -200,8 +232,10 @@ export const STORAGE_KEYS = {
   GAMES:    'bbscoring_games',
   GAME:     'bbscoring_game_',
   TEAMS:    'bbscoring_teams',
+  USERS:    'bbscoring_users',
   SETTINGS: 'bbscoring_settings',
-  CURRENT:  'bbscoring_current'
+  CURRENT:  'bbscoring_current',
+  AUTH:     'bbscoring_auth_session'
 };
 
 // 預設設定
@@ -219,6 +253,9 @@ export const DEFAULT_SETTINGS = {
   showPitchSpeed: false,
   showPitchType: false
 };
+
+// 資料版本
+export const DATA_VERSION = 2;
 
 // 最大值
 export const MAX_UNDO = 50;

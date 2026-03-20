@@ -55,6 +55,11 @@ export function getVal(obj, path, defaultVal = '') {
 /** 建立 DOM 元素 */
 export function createElement(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
+  // Support shorthand: createElement('div', 'className')
+  if (typeof attrs === 'string') {
+    el.className = attrs;
+    return el;
+  }
   for (const [key, value] of Object.entries(attrs)) {
     if (key === 'className') {
       el.className = value;

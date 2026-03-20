@@ -96,6 +96,8 @@ export class GameEngine {
       if (pitchResult === 'HBP') {
         this.recorder.setHBP();
       } else if (pitchResult === 'IBB') {
+        // IBB: 補足壞球到 4 顆（如原本 1 壞球則 +3）
+        this.game.currentState.balls = 4;
         this.recorder.setIBB();
       }
       const { movements, runs } = this._autoAdvance(pitchInfo.result, this.recorder.getCurrentAtBat().batterId);
@@ -112,7 +114,10 @@ export class GameEngine {
     if (pitchResult === 'WP' || pitchResult === 'PB' || pitchResult === 'BK') {
       const event = pitchResult;
 
-      if (this.runnerMgr.hasRunners() && (pitchResult === 'WP' || pitchResult === 'PB')) {
+      // BK/WP/PB: 壘上有無人的判斷是在投球當下
+      const hadRunners = this.runnerMgr.hasRunners();
+
+      if (hadRunners && (pitchResult === 'WP' || pitchResult === 'PB')) {
         // WP/PB with runners: defer advancement to UI (modal asks per-runner bases)
         // Only record the ball count here; UI will call applyCustomAdvancement later
         this.game.currentState.balls++;
@@ -129,11 +134,10 @@ export class GameEngine {
         return;
       }
 
-      if (this.runnerMgr.hasRunners()) {
-        // BK with runners: auto-advance 1 base (standard rule)
+      if (hadRunners && pitchResult === 'BK') {
+        // BK with runners: auto-advance 1 base, 不計壞球
         const { movements, runs } = this.runnerMgr.advanceAllRunners(event);
         this._addRuns(runs);
-        // 將事件記錄到打席
         const ab = this.recorder.getCurrentAtBat();
         if (ab) {
           ab.events.push({
@@ -147,19 +151,9 @@ export class GameEngine {
           movements.forEach(m => ab.runnerMovements.push(m));
         }
       }
-      // BK: 壘上無人計壞球，壘上有人僅推進不計壞球
-      if (pitchResult === 'BK' && !this.runnerMgr.hasRunners()) {
-        this.game.currentState.balls++;
-        if (this.game.currentState.balls >= 4) {
-          this.recorder.setWalk();
-          const { movements, runs } = this._autoAdvance('BB', this.recorder.getCurrentAtBat().batterId);
-          this.recorder.setRunnerMovements(movements);
-          this._addRuns(runs);
-          this._finishAtBat();
-        }
-      }
-      // WP/PB without runners: count as ball
-      if ((pitchResult === 'WP' || pitchResult === 'PB') && !this.runnerMgr.hasRunners()) {
+
+      // 壘上無人：WP/PB/BK 都計壞球
+      if (!hadRunners) {
         this.game.currentState.balls++;
         if (this.game.currentState.balls >= 4) {
           this.recorder.setWalk();

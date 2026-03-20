@@ -1,0 +1,238 @@
+/**
+ * BBScoring — AtBatResultPanel styles (Result-Only mode)
+ */
+
+/* ═══════════════════════════════════════
+   AtBat Result Panel (Result-Only)
+   ═══════════════════════════════════════ */
+
+.atbat-panel {
+  padding: var(--space-sm) 0;
+}
+
+.atbat-panel__section {
+  margin-bottom: var(--space-md);
+}
+
+.atbat-panel__section-label {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-xs);
+  padding-left: var(--space-xs);
+}
+
+.atbat-panel__row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.atbat-panel__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-xs);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  min-height: var(--touch-min);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.atbat-panel__btn:active {
+  transform: scale(0.95);
+}
+
+.atbat-panel__btn-label {
+  font-size: var(--fs-sub);
+  font-weight: 600;
+}
+
+/* ── Result Type Colors ── */
+
+.atbat-panel__btn--hit {
+  border-color: rgba(52, 152, 219, 0.4);
+  background: rgba(52, 152, 219, 0.1);
+}
+
+.atbat-panel__btn--hit:active {
+  background: rgba(52, 152, 219, 0.3);
+}
+
+.atbat-panel__btn--hr {
+  border-color: rgba(155, 89, 182, 0.5);
+  background: rgba(155, 89, 182, 0.15);
+  color: var(--color-hr);
+}
+
+.atbat-panel__btn--hr:active {
+  background: rgba(155, 89, 182, 0.35);
+}
+
+.atbat-panel__btn--out {
+  border-color: rgba(231, 76, 60, 0.3);
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.atbat-panel__btn--out:active {
+  background: rgba(231, 76, 60, 0.25);
+}
+
+.atbat-panel__btn--sac {
+  border-color: rgba(241, 196, 15, 0.3);
+  background: rgba(241, 196, 15, 0.08);
+}
+
+.atbat-panel__btn--sac:active {
+  background: rgba(241, 196, 15, 0.2);
+}
+
+.atbat-panel__btn--bb {
+  border-color: rgba(39, 174, 96, 0.4);
+  background: rgba(39, 174, 96, 0.1);
+}
+
+.atbat-panel__btn--bb:active {
+  background: rgba(39, 174, 96, 0.3);
+}
+
+.atbat-panel__btn--hbp {
+  border-color: rgba(230, 126, 34, 0.4);
+  background: rgba(230, 126, 34, 0.1);
+}
+
+.atbat-panel__btn--hbp:active {
+  background: rgba(230, 126, 34, 0.3);
+}
+
+.atbat-panel__btn--error {
+  border-color: rgba(230, 126, 34, 0.4);
+  background: rgba(230, 126, 34, 0.1);
+}
+
+.atbat-panel__btn--error:active {
+  background: rgba(230, 126, 34, 0.3);
+}
+
+/* ── Confirm Step ── */
+
+.atbat-panel__confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+}
+
+.atbat-panel__selected {
+  text-align: center;
+}
+
+.atbat-panel__selected-type {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── RBI Counter ── */
+
+.atbat-panel__rbi-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  width: 100%;
+  justify-content: center;
+}
+
+.atbat-panel__rbi-label {
+  font-size: var(--fs-player);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.atbat-panel__rbi-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.atbat-panel__rbi-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-round);
+  border: 2px solid var(--color-primary-light);
+  background: transparent;
+  color: var(--color-primary-light);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.atbat-panel__rbi-btn:active {
+  background: rgba(41, 128, 185, 0.2);
+}
+
+.atbat-panel__rbi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-score);
+  color: var(--text-primary);
+  min-width: 2ch;
+  text-align: center;
+}
+
+/* ── Action Buttons ── */
+
+.atbat-panel__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.atbat-panel__action-btn {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-button);
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  min-height: var(--touch-min);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.atbat-panel__action-btn--cancel {
+  background: var(--bg-input);
+  color: var(--text-secondary);
+}
+
+.atbat-panel__action-btn--confirm {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.atbat-panel__action-btn:active {
+  opacity: 0.8;
+}
+
+/* ── LiveRecord mode-specific ── */
+
+.live-layout__atbat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 var(--space-sm);
+}

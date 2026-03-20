@@ -3,6 +3,7 @@
  */
 import { createElement, showConfirm, showToast } from '../utils/helpers.js';
 import { HALF_INNING, PITCH_RESULTS, HIT_RESULTS } from '../utils/constants.js';
+import { GestureHandler } from '../utils/gestures.js';
 
 export class HistoryPanel {
   constructor({ container, game, engine, onBack }) {
@@ -23,11 +24,18 @@ export class HistoryPanel {
     // Header
     const header = createElement('div', { className: 'history-panel__header' });
     header.appendChild(createElement('button', {
-      className: 'btn btn--icon', innerHTML: '◀',
+      className: 'btn btn--icon', innerHTML: '←', // Unified back icon
       onClick: () => { if (this.onBack) this.onBack(); }
     }));
     header.appendChild(createElement('h3', { textContent: '比賽記錄' }));
     wrapper.appendChild(header);
+
+    // Swipe to go back
+    new GestureHandler(wrapper).el.addEventListener('swipe', (e) => {
+      if (e.detail.direction === 'right' && this.onBack) {
+        this.onBack();
+      }
+    });
 
     // 逐局列表
     const list = createElement('div', { className: 'history-panel__list scrollable' });

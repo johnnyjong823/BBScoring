@@ -59,13 +59,13 @@
   width: 10px;
   height: 10px;
   border-radius: var(--radius-round);
-  border: 2px solid var(--color-foul);
+  border: 2px solid var(--color-out);
   background: transparent;
   transition: background-color var(--transition-fast);
 }
 
 .status-bar__dot.filled {
-  background-color: var(--color-foul);
+  background-color: var(--color-out);
 }
 
 /* === 主內容區 — 平板橫向雙欄 === */

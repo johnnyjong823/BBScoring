@@ -129,14 +129,91 @@
   font-size: var(--fs-sub);
 }
 
+/* Two-layer pitch flow */
+.pitch-buttons__inplay {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+}
+
+.pitch-buttons__inplay .btn {
+  min-height: var(--touch-primary);
+  font-size: var(--fs-inning);
+  font-weight: 700;
+}
+
+.pitch-buttons__primary--triple {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.pitch-buttons__back-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-xs);
+}
+
+.pitch-buttons__layer-label {
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* 鍵盤快捷提示 */
+.kbd-hint {
+  display: inline-block;
+  font-size: 0.65em;
+  padding: 1px 5px;
+  margin-left: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  font-family: var(--font-score);
+  vertical-align: middle;
+  opacity: 0.6;
+}
+
+.pitch-buttons__key-buffer {
+  text-align: center;
+  padding: var(--space-xs) var(--space-sm);
+  margin-bottom: var(--space-xs);
+  font-size: var(--fs-sub);
+  color: var(--color-primary-light);
+  background-color: rgba(52, 152, 219, 0.12);
+  border-radius: var(--radius-md);
+  animation: pulse-hint 1s ease infinite;
+}
+
+@keyframes pulse-hint {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.pitch-buttons__waiting {
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  color: var(--text-muted);
+  font-size: var(--fs-sub);
+  font-style: italic;
+}
+
 /* === 球數顯示 === */
 .count-display {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-md);
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
   background-color: var(--bg-card);
   border-radius: var(--radius-lg);
+  margin: 0 var(--space-md);
+}
+
+.count-display__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 .count-display__row {
@@ -146,15 +223,31 @@
 }
 
 .count-display__label {
-  font-size: var(--fs-sub);
-  color: var(--text-secondary);
-  width: 50px;
-  text-align: right;
+  font-size: var(--fs-button);
+  font-weight: 700;
+  width: auto;
+  text-align: center;
+  min-width: 20px;
+}
+
+.count-display__label--ball {
+  color: var(--color-ball);
+}
+
+.count-display__label--strike {
+  color: var(--color-strike);
 }
 
 .count-display__dots {
   display: flex;
   gap: var(--space-xs);
+}
+
+.count-display__pitch-count {
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+  font-family: var(--font-score);
+  white-space: nowrap;
 }
 
 .count-dot {
@@ -182,11 +275,11 @@
 }
 
 .count-dot--out {
-  border-color: var(--color-foul);
+  border-color: var(--color-out);
 }
 
 .count-dot--out.filled {
-  background-color: var(--color-foul);
+  background-color: var(--color-out);
 }
 
 .count-dot--foul {
@@ -290,6 +383,76 @@
   margin-top: var(--space-xs);
 }
 
+/* === 投手資訊區 (LiveRecord) === */
+.pitcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  margin: 0 var(--space-md);
+  background-color: var(--bg-card);
+  border-radius: var(--radius-lg);
+  gap: var(--space-sm);
+}
+
+.pitcher-header__empty {
+  color: var(--text-muted);
+  font-size: var(--fs-sub);
+}
+
+.pitcher-header__left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pitcher-header__name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.pitcher-header__name {
+  font-weight: 700;
+  font-size: var(--fs-button);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color var(--transition-fast);
+}
+
+.pitcher-header__name:hover {
+  text-decoration-color: var(--color-primary-light);
+}
+
+.pitcher-header__number {
+  color: var(--color-primary-light);
+  font-weight: 500;
+  font-size: var(--fs-sub);
+}
+
+.pitcher-header__hand {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  background-color: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.pitcher-header__stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: var(--fs-small);
+  color: var(--text-secondary);
+}
+
+.pitcher-header__change {
+  flex-shrink: 0;
+}
+
 /* === 打擊結果面板 === */
 .hit-result-section {
   margin-bottom: var(--space-lg);
@@ -362,6 +525,269 @@
 .fielding-path__arrow {
   color: var(--text-muted);
   font-size: var(--fs-inning);
+}
+
+/* === 步驟式擊出精靈 (Hit Wizard) === */
+
+/* Hit Result Panel */
+.hit-result-panel {
+  padding: var(--space-md) var(--space-md) var(--space-lg);
+}
+
+.hit-result-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
+  border-bottom: 2px solid var(--color-primary, #4a90d9);
+}
+
+.hit-result-panel__header h3 {
+  flex: 1;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  margin: 0;
+}
+
+.hit-result-panel__step {
+  font-size: var(--fs-sub);
+  color: var(--text-muted);
+  white-space: nowrap;
+  background: rgba(255,255,255,0.08);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.hit-result-panel__body {
+  max-height: 60vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hit-result-panel__section-label {
+  font-size: var(--fs-sub);
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hit-wizard__type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.hit-wizard__type-grid .btn {
+  min-height: calc(var(--touch-primary) * 1.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  font-size: var(--fs-button);
+  font-weight: 700;
+  border-radius: var(--radius-lg, 12px);
+  border: 2px solid rgba(255,255,255,0.12);
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+  transition: all 0.15s ease;
+}
+
+.hit-wizard__type-grid .btn:active {
+  transform: scale(0.96);
+  border-color: var(--color-primary-light);
+}
+
+.hit-wizard__type-icon {
+  font-size: var(--fs-scoreboard);
+}
+
+.hit-wizard__path-display {
+  font-size: var(--fs-button);
+  font-weight: 700;
+  text-align: center;
+  padding: var(--space-sm) var(--space-md);
+  background: linear-gradient(135deg, rgba(74,144,217,0.15) 0%, rgba(74,144,217,0.05) 100%);
+  border: 1px solid rgba(74,144,217,0.25);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-sm);
+  font-family: var(--font-score);
+  letter-spacing: 0.05em;
+  color: var(--color-primary-light, #6cb3ff);
+}
+
+.hit-wizard__pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+}
+
+.hit-wizard__pos-btn {
+  min-height: var(--touch-min);
+  font-size: var(--fs-sub);
+  border-radius: var(--radius-md);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  font-weight: 600;
+  transition: all 0.12s ease;
+}
+
+.hit-wizard__pos-btn:active {
+  transform: scale(0.95);
+  border-color: var(--color-primary-light);
+}
+
+.hit-wizard__actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.hit-wizard__actions .btn--primary {
+  flex: 1;
+  min-width: 120px;
+}
+
+.hit-wizard__result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.hit-wizard__result-grid .btn {
+  min-height: calc(var(--touch-primary) * 1.2);
+  font-size: var(--fs-button);
+  font-weight: 700;
+  border-radius: var(--radius-lg, 12px);
+  border: 2px solid rgba(255,255,255,0.12);
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+  transition: all 0.15s ease;
+}
+
+.hit-wizard__result-grid .btn:active {
+  transform: scale(0.96);
+}
+
+.hit-wizard__hit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.hit-wizard__hit-grid .btn {
+  min-height: var(--touch-primary);
+  font-size: var(--fs-button);
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  border: 2px solid rgba(255,255,255,0.1);
+}
+
+.hit-wizard__hit-grid .btn:active {
+  transform: scale(0.96);
+}
+
+.hit-wizard__out-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.hit-wizard__out-grid .btn {
+  min-height: var(--touch-min);
+}
+
+.hit-wizard__disabled {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
+.hit-wizard__highlight {
+  border-color: var(--color-primary-light) !important;
+}
+
+.hit-wizard__base-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+}
+
+.hit-wizard__runner-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.hit-wizard__selected-badge {
+  font-size: var(--fs-button);
+  font-weight: 700;
+  color: var(--color-primary-light);
+  padding: var(--space-sm);
+  text-align: center;
+  margin-bottom: var(--space-sm);
+}
+
+.hit-wizard__warning {
+  color: var(--color-warning, #f1c40f);
+  font-size: var(--fs-sub);
+  padding: var(--space-sm);
+  background-color: rgba(241, 196, 15, 0.1);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-xs);
+}
+
+.hit-wizard__yn-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  gap: var(--space-sm);
+  background: rgba(255,255,255,0.03);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-xs);
+}
+
+.hit-wizard__yn-label {
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+}
+
+.hit-wizard__yn-btns {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.hit-wizard__number-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) 0;
+}
+
+.hit-wizard__number-group label {
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+}
+
+.hit-wizard__summary {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  font-size: var(--fs-sub);
+  line-height: 1.6;
+}
+
+.hit-wizard__notes {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--space-sm);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sub);
+  resize: vertical;
 }
 
 /* === 比賽卡片（首頁） === */
