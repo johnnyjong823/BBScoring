@@ -61,12 +61,12 @@ export class HitResultPanel {
       hitBases: null,
       advancement: false,
       advancementReason: null,
-      scored: false,
-      rbi: 0,
       errorPosition: null,
       baseReached: null,
       fcOutOccurred: false,
       fcOutRunner: null,
+      // Phase B: runner outcomes — auto-filled then user-adjustable
+      runnerOutcomes: null, // { batter: {dest}, first: {dest}, second: {dest}, third: {dest} }
       notes: ''
     };
   }
@@ -85,6 +85,7 @@ export class HitResultPanel {
       case 'out-detail':   body.appendChild(this._renderOutDetailStep()); break;
       case 'error-detail': body.appendChild(this._renderErrorDetailStep()); break;
       case 'fc-detail':    body.appendChild(this._renderFCDetailStep()); break;
+      case 'runners':      body.appendChild(this._renderRunnersStep()); break;
       case 'notes':        body.appendChild(this._renderNotesStep()); break;
     }
     panel.appendChild(body);
@@ -118,24 +119,26 @@ export class HitResultPanel {
       'out-detail': '步驟 3-2：出局詳情',
       'error-detail': '步驟 3-3：失誤詳情',
       'fc-detail': '步驟 3-4：野選詳情',
-      'notes': '步驟 4：備註'
+      'runners': '步驟 4：跑壘結果',
+      'notes': '步驟 5：確認'
     };
     header.appendChild(createElement('h3', { textContent: STEP_LABELS[this._step] || '打擊結果' }));
 
     const STEP_NUM = {
       'type': 1, 'direction': 2, 'result': 3,
       'hit-detail': 3, 'out-detail': 3, 'error-detail': 3, 'fc-detail': 3,
-      'notes': 4
+      'runners': 4, 'notes': 5
     };
     header.appendChild(createElement('span', {
       className: 'hit-result-panel__step',
-      textContent: `${STEP_NUM[this._step] || 1}/4`
+      textContent: `${STEP_NUM[this._step] || 1}/5`
     }));
 
     return header;
   }
 
   _goBack() {
+    const d = this._data;
     const BACK_MAP = {
       'direction': 'type',
       'result': 'direction',
@@ -143,13 +146,18 @@ export class HitResultPanel {
       'out-detail': 'result',
       'error-detail': 'result',
       'fc-detail': 'result',
-      'notes': this._data.resultCategory ? `${this._data.resultCategory}-detail` : 'result'
+      'runners': d.resultCategory ? `${d.resultCategory}-detail` : 'result',
+      'notes': 'runners'
     };
     // When going back to result step, clear result selection
     if (this._step.endsWith('-detail') && BACK_MAP[this._step] === 'result') {
-      this._data.resultCategory = null;
-      this._data.resultType = null;
-      this._data.hitBases = null;
+      d.resultCategory = null;
+      d.resultType = null;
+      d.hitBases = null;
+    }
+    // When going back from runners, clear outcomes
+    if (this._step === 'runners') {
+      d.runnerOutcomes = null;
     }
     this._step = BACK_MAP[this._step] || 'type';
     this.render();
@@ -296,6 +304,8 @@ export class HitResultPanel {
             Vibration.tap();
             d.hitBases = o.val;
             d.resultType = ['', '1B', '2B', '3B', 'HR'][o.val];
+            this._initRunnerOutcomes();
+            this._step = 'runners';
             this.render();
           }
         }));
@@ -304,26 +314,6 @@ export class HitResultPanel {
       return frag;
     }
 
-    // Selected type badge
-    const typeLabel = ['', '一壘安打', '二壘安打', '三壘安打', '全壘打'][d.hitBases];
-    frag.appendChild(createElement('div', { className: 'hit-wizard__selected-badge', textContent: `✓ ${typeLabel}` }));
-
-    // Follow-up questions
-    if (d.hitBases < 4) {
-      frag.appendChild(this._ynToggle('是否有額外進壘？', d.advancement, v => { d.advancement = v; this.render(); }));
-      if (d.advancement) {
-        frag.appendChild(this._choiceBtns('進壘原因', [
-          { val: 'throw', label: '趁傳' }, { val: 'error', label: '失誤' }
-        ], d.advancementReason, v => { d.advancementReason = v; this.render(); }));
-      }
-    }
-
-    frag.appendChild(this._ynToggle('是否有得分？', d.scored, v => { d.scored = v; this.render(); }));
-    if (this.hasRunners || d.scored || d.hitBases === 4) {
-      frag.appendChild(this._numberCtrl('打點 (RBI)', 'rbi'));
-    }
-
-    frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
     return frag;
   }
 
@@ -360,15 +350,7 @@ export class HitResultPanel {
     const outInfo = OUT_OPTIONS.find(o => o.val === d.resultType);
     frag.appendChild(createElement('div', { className: 'hit-wizard__selected-badge', textContent: `✓ ${outInfo?.label || d.resultType}` }));
 
-    if (this.hasRunners) {
-      frag.appendChild(this._numberCtrl('打點 (RBI)', 'rbi'));
-    }
-
-    if ((d.resultType === 'DP' || d.resultType === 'TP') && d.rbi > 0) {
-      frag.appendChild(createElement('div', { className: 'hit-wizard__warning', textContent: '⚠ 雙殺/三殺通常不計打點，請再次確認' }));
-    }
-
-    frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
+    frag.appendChild(this._nextBtn(() => { this._initRunnerOutcomes(); this._step = 'runners'; this.render(); }));
     return frag;
   }
 
@@ -412,7 +394,7 @@ export class HitResultPanel {
     }
 
     if (d.errorPosition && d.baseReached) {
-      frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
+      frag.appendChild(this._nextBtn(() => { this._initRunnerOutcomes(); this._step = 'runners'; this.render(); }));
     }
     return frag;
   }
@@ -446,8 +428,209 @@ export class HitResultPanel {
       frag.appendChild(grid);
     }
 
+    frag.appendChild(this._nextBtn(() => { d.resultType = 'FC'; this._initRunnerOutcomes(); this._step = 'runners'; this.render(); }));
+    return frag;
+  }
+
+  // ═══════════════════════════════════════════
+  // Phase B: Runner Outcomes
+  // ═══════════════════════════════════════════
+
+  /** Initialize runner outcomes with smart defaults based on result type */
+  _initRunnerOutcomes() {
+    const d = this._data;
+    const runners = this.runners; // { first: playerObj|null, second: playerObj|null, third: playerObj|null }
+    const outcomes = {};
+    const info = HIT_RESULTS_INFO[d.resultType];
+    const bases = info?.bases || 0;
+    const cat = info?.category;
+
+    // Determine possible destinations for each person
+    // "out" = out at current base, "stay" = remain, "first"..."home" = advance to that base
+    const BASES_ORDER = ['first', 'second', 'third', 'home'];
+
+    if (cat === 'HIT') {
+      // Hit defaults from autoAdvanceRunners logic
+      if (bases === 4) {
+        // HR: everyone scores
+        if (runners.third) outcomes.third = { dest: 'home' };
+        if (runners.second) outcomes.second = { dest: 'home' };
+        if (runners.first) outcomes.first = { dest: 'home' };
+        outcomes.batter = { dest: 'home' };
+      } else if (bases === 3) {
+        if (runners.third) outcomes.third = { dest: 'home' };
+        if (runners.second) outcomes.second = { dest: 'home' };
+        if (runners.first) outcomes.first = { dest: 'home' };
+        outcomes.batter = { dest: 'third' };
+      } else if (bases === 2) {
+        if (runners.third) outcomes.third = { dest: 'home' };
+        if (runners.second) outcomes.second = { dest: 'home' };
+        if (runners.first) outcomes.first = { dest: 'third' };
+        outcomes.batter = { dest: 'second' };
+      } else if (bases === 1) {
+        if (runners.third) outcomes.third = { dest: 'home' };
+        if (runners.second) outcomes.second = { dest: 'third' };
+        if (runners.first) outcomes.first = { dest: 'second' };
+        outcomes.batter = { dest: 'first' };
+      }
+    } else if (cat === 'OUT' || cat === 'SAC') {
+      // Out: batter is out, runners stay unless SAC/SF
+      if (runners.third) outcomes.third = { dest: (d.resultType === 'SF') ? 'home' : 'stay' };
+      if (runners.second) outcomes.second = { dest: 'stay' };
+      if (runners.first) outcomes.first = { dest: 'stay' };
+      outcomes.batter = { dest: 'out' };
+
+      // DP: batter out + one runner out (default lead runner)
+      if (d.resultType === 'DP') {
+        if (runners.first) outcomes.first = { dest: 'out' };
+        else if (runners.second) outcomes.second = { dest: 'out' };
+      }
+      // TP: batter out + two runners out
+      if (d.resultType === 'TP') {
+        if (runners.first) outcomes.first = { dest: 'out' };
+        if (runners.second) outcomes.second = { dest: 'out' };
+        if (!runners.first && runners.third) outcomes.third = { dest: 'out' };
+      }
+    } else if (d.resultType === 'E') {
+      // Error: batter reaches base specified in error-detail
+      if (runners.third) outcomes.third = { dest: 'home' };
+      if (runners.second) outcomes.second = { dest: 'third' };
+      if (runners.first) outcomes.first = { dest: 'second' };
+      outcomes.batter = { dest: d.baseReached || 'first' };
+    } else if (d.resultType === 'FC') {
+      // FC: batter reaches first, specified runner is out
+      outcomes.batter = { dest: 'first' };
+      if (runners.third) outcomes.third = { dest: d.fcOutRunner === 'third' ? 'out' : 'stay' };
+      if (runners.second) outcomes.second = { dest: d.fcOutRunner === 'second' ? 'out' : 'stay' };
+      if (runners.first) outcomes.first = { dest: d.fcOutRunner === 'first' ? 'out' : 'stay' };
+    } else {
+      // Fallback
+      if (runners.third) outcomes.third = { dest: 'stay' };
+      if (runners.second) outcomes.second = { dest: 'stay' };
+      if (runners.first) outcomes.first = { dest: 'stay' };
+      outcomes.batter = { dest: 'first' };
+    }
+
+    d.runnerOutcomes = outcomes;
+  }
+
+  /** Get valid destinations for a person given their starting base */
+  _getDestOptions(fromBase) {
+    const all = [
+      { val: 'out', label: '出局', cls: 'btn--danger' }
+    ];
+    if (fromBase === 'home') {
+      // Batter
+      all.push({ val: 'first', label: '一壘', cls: 'btn--outline' });
+      all.push({ val: 'second', label: '二壘', cls: 'btn--outline' });
+      all.push({ val: 'third', label: '三壘', cls: 'btn--outline' });
+      all.push({ val: 'home', label: '得分', cls: 'btn--hit-hr' });
+    } else {
+      // Runner on base — can stay, advance, or be out
+      const baseNames = { first: '一壘', second: '二壘', third: '三壘', home: '得分' };
+      const order = ['first', 'second', 'third', 'home'];
+      const idx = order.indexOf(fromBase);
+      all.push({ val: 'stay', label: `留${baseNames[fromBase]}`, cls: 'btn--outline' });
+      for (let i = idx + 1; i < order.length; i++) {
+        const isScore = order[i] === 'home';
+        all.push({ val: order[i], label: isScore ? '得分' : baseNames[order[i]], cls: isScore ? 'btn--hit-hr' : 'btn--outline' });
+      }
+    }
+    return all;
+  }
+
+  _renderRunnersStep() {
+    const frag = document.createDocumentFragment();
+    const d = this._data;
+    const outcomes = d.runnerOutcomes;
+    if (!outcomes) { this._initRunnerOutcomes(); return this._renderRunnersStep(); }
+
+    const resultInfo = HIT_RESULTS_INFO[d.resultType];
+    frag.appendChild(createElement('div', { className: 'section-label', textContent: `跑壘結果 — ${resultInfo?.name || d.resultType}` }));
+    frag.appendChild(createElement('div', { className: 'hit-wizard__runner-hint', textContent: '系統已自動預填，可依實際調整' }));
+
+    const baseLabel = { third: '三壘跑者', second: '二壘跑者', first: '一壘跑者' };
+    const container = createElement('div', { className: 'runner-outcomes' });
+
+    // Show runners from third → first, then batter
+    ['third', 'second', 'first'].forEach(base => {
+      if (!outcomes[base]) return;
+      const runner = this.runners[base];
+      const name = runner ? (runner.name || `#${runner.number}`) : baseLabel[base];
+
+      const row = createElement('div', { className: 'runner-outcomes__row' });
+      const label = createElement('div', { className: 'runner-outcomes__label' });
+      label.innerHTML = `<span class="runner-outcomes__base">${baseLabel[base]}</span><span class="runner-outcomes__name">${name}</span>`;
+      row.appendChild(label);
+
+      const btns = createElement('div', { className: 'runner-outcomes__btns' });
+      this._getDestOptions(base).forEach(opt => {
+        const selected = outcomes[base].dest === opt.val;
+        btns.appendChild(createElement('button', {
+          className: `btn btn--sm ${selected ? (opt.val === 'out' ? 'btn--danger' : opt.val === 'home' ? 'btn--hit-hr' : 'btn--primary') : opt.cls}`,
+          textContent: opt.label,
+          onClick: () => { Vibration.tap(); outcomes[base].dest = opt.val; this.render(); }
+        }));
+      });
+      row.appendChild(btns);
+      container.appendChild(row);
+    });
+
+    // Batter
+    if (outcomes.batter) {
+      const batter = createElement('div', { className: 'runner-outcomes__row runner-outcomes__row--batter' });
+      const batterLabel = createElement('div', { className: 'runner-outcomes__label' });
+      batterLabel.innerHTML = `<span class="runner-outcomes__base">打者</span><span class="runner-outcomes__name">⚾</span>`;
+
+      const btns = createElement('div', { className: 'runner-outcomes__btns' });
+      this._getDestOptions('home').forEach(opt => {
+        const selected = outcomes.batter.dest === opt.val;
+        btns.appendChild(createElement('button', {
+          className: `btn btn--sm ${selected ? (opt.val === 'out' ? 'btn--danger' : opt.val === 'home' ? 'btn--hit-hr' : 'btn--primary') : opt.cls}`,
+          textContent: opt.label,
+          onClick: () => { Vibration.tap(); outcomes.batter.dest = opt.val; this.render(); }
+        }));
+      });
+      batter.append(batterLabel, btns);
+      container.appendChild(batter);
+    }
+
+    frag.appendChild(container);
+
+    // Auto-calculated summary
+    const { runs, rbi, outs } = this._calcFromOutcomes();
+    const summaryDiv = createElement('div', { className: 'runner-outcomes__summary' });
+    summaryDiv.innerHTML = `<span>得分: <strong>${runs}</strong></span> <span>打點: <strong>${rbi}</strong></span> <span>出局: <strong>${outs}</strong></span>`;
+    frag.appendChild(summaryDiv);
+
     frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
     return frag;
+  }
+
+  /** Calculate runs, RBI, and outs from runner outcomes */
+  _calcFromOutcomes() {
+    const outcomes = this._data.runnerOutcomes;
+    if (!outcomes) return { runs: 0, rbi: 0, outs: 0 };
+
+    let runs = 0, outs = 0;
+    const cat = HIT_RESULTS_INFO[this._data.resultType]?.category;
+
+    // Count scoring runners (not batter)
+    ['third', 'second', 'first'].forEach(base => {
+      if (outcomes[base]?.dest === 'home') runs++;
+      if (outcomes[base]?.dest === 'out') outs++;
+    });
+
+    // Batter
+    if (outcomes.batter?.dest === 'home') runs++;
+    if (outcomes.batter?.dest === 'out') outs++;
+
+    // RBI: runs scored, except errors don't count RBI, DP usually doesn't
+    let rbi = runs;
+    if (cat === 'ERROR') rbi = 0;
+    if (this._data.resultType === 'DP') rbi = 0;
+
+    return { runs, rbi, outs };
   }
 
   // ═══════════════════════════════════════════
@@ -483,6 +666,7 @@ export class HitResultPanel {
   _renderSummary() {
     const d = this._data;
     const typeMap = { G: '滾地', F: '飛球', L: '平飛' };
+    const baseNames = { first: '一壘', second: '二壘', third: '三壘', home: '得分', stay: '留壘', out: '出局' };
     const lines = [];
     if (d.hitType) lines.push(`打擊類型: ${typeMap[d.hitType]}`);
     if (d.fieldingPath.length) lines.push(`守備路徑: ${d.fieldingPath.join('-')}`);
@@ -490,12 +674,22 @@ export class HitResultPanel {
       const info = HIT_RESULTS_INFO[d.resultType];
       lines.push(`結果: ${info ? info.name : d.resultType}`);
     }
-    if (d.rbi > 0) lines.push(`打點: ${d.rbi}`);
-    if (d.advancement) lines.push(`額外進壘: ${d.advancementReason === 'throw' ? '趁傳' : '失誤'}`);
     if (d.errorPosition) lines.push(`失誤守位: ${POS_LABELS[d.errorPosition]}`);
-    if (d.baseReached) {
-      const baseNames = { first: '一壘', second: '二壘', third: '三壘', home: '本壘' };
-      lines.push(`上壘: ${baseNames[d.baseReached]}`);
+
+    // Runner outcomes summary
+    if (d.runnerOutcomes) {
+      const { runs, rbi } = this._calcFromOutcomes();
+      const baseLabel = { third: '三壘', second: '二壘', first: '一壘' };
+      ['third', 'second', 'first'].forEach(base => {
+        if (d.runnerOutcomes[base]) {
+          lines.push(`${baseLabel[base]}跑者: ${baseNames[d.runnerOutcomes[base].dest]}`);
+        }
+      });
+      if (d.runnerOutcomes.batter) {
+        lines.push(`打者: ${baseNames[d.runnerOutcomes.batter.dest]}`);
+      }
+      if (runs > 0) lines.push(`得分: ${runs}`);
+      if (rbi > 0) lines.push(`打點: ${rbi}`);
     }
 
     const box = createElement('div', { className: 'hit-wizard__summary' });
@@ -511,25 +705,29 @@ export class HitResultPanel {
     const d = this._data;
     if (!d.resultType) { showToast('請完成所有步驟'); return; }
 
+    const { runs, rbi } = this._calcFromOutcomes();
+
     const result = createHitResult({
       type: d.resultType,
       hitType: d.hitType,
       direction: { zone: null, subZone: null, x: null, y: null },
       fieldingPath: d.fieldingPath.map(n => POS_NUM_MAP[n]),
-      rbi: d.rbi,
+      rbi,
       isError: d.resultCategory === 'error',
       errorFielder: d.errorPosition ? POS_NUM_MAP[d.errorPosition] : null,
       errorType: null
     });
 
-    // Attach extra metadata for downstream use
+    // Attach metadata
     result.notes = d.notes;
-    result.advancement = d.advancement;
-    result.advancementReason = d.advancementReason;
-    result.scored = d.scored;
     result.baseReached = d.baseReached;
     result.fcOutOccurred = d.fcOutOccurred;
     result.fcOutRunner = d.fcOutRunner;
+
+    // Build runnerOverrides from Phase B outcomes
+    if (d.runnerOutcomes) {
+      result.runnerOverrides = this._buildRunnerOverrides();
+    }
 
     // Reset wizard
     this._step = 'type';
@@ -537,6 +735,60 @@ export class HitResultPanel {
 
     Vibration.heavy();
     if (this.onResult) this.onResult(result);
+  }
+
+  /** Convert Phase B runner outcomes to runnerOverrides for GameEngine */
+  _buildRunnerOverrides() {
+    const outcomes = this._data.runnerOutcomes;
+    const runners = this.runners; // player objects with .id
+    const newRunners = { first: null, second: null, third: null };
+    const movements = [];
+    let runs = 0;
+
+    // Process each runner (third → first order)
+    ['third', 'second', 'first'].forEach(base => {
+      if (!outcomes[base]) return;
+      const runnerId = runners[base]?.id || runners[base];
+      if (!runnerId) return;
+
+      const dest = outcomes[base].dest;
+      if (dest === 'out') {
+        movements.push({ runnerId, from: base, to: base, event: 'HIT', scored: false, earnedRun: false, out: true });
+      } else if (dest === 'home') {
+        movements.push({ runnerId, from: base, to: 'home', event: 'HIT', scored: true, earnedRun: true });
+        runs++;
+      } else if (dest === 'stay') {
+        newRunners[base] = runnerId;
+      } else {
+        // Advanced to a specific base
+        newRunners[dest] = runnerId;
+        movements.push({ runnerId, from: base, to: dest, event: 'HIT', scored: false, earnedRun: false });
+      }
+    });
+
+    // Batter
+    if (outcomes.batter) {
+      const batterId = this._getBatterId();
+      const dest = outcomes.batter.dest;
+      if (dest === 'out') {
+        movements.push({ runnerId: batterId, from: 'home', to: 'home', event: 'HIT', scored: false, earnedRun: false, out: true });
+      } else if (dest === 'home') {
+        movements.push({ runnerId: batterId, from: 'home', to: 'home', event: 'HIT', scored: true, earnedRun: true });
+        runs++;
+      } else if (dest && dest !== 'stay') {
+        newRunners[dest] = batterId;
+        movements.push({ runnerId: batterId, from: 'home', to: dest, event: 'HIT', scored: false, earnedRun: false });
+      }
+    }
+
+    return { newRunners, movements, runs };
+  }
+
+  /** Get current batter ID — uses runner info structure */
+  _getBatterId() {
+    // The batter ID is not directly in this.runners. It comes from the engine.
+    // We'll return a placeholder; the engine will use its own batterId.
+    return '__batter__';
   }
 
   // ═══════════════════════════════════════════
@@ -585,12 +837,9 @@ export class HitResultPanel {
             const n = parseInt(key);
             d.hitBases = n;
             d.resultType = ['', '1B', '2B', '3B', 'HR'][n];
-            this.render(); e.preventDefault();
+            this._initRunnerOutcomes();
+            this._step = 'runners'; this.render(); e.preventDefault();
           }
-        } else {
-          if (key === 'Y') { this._hitDetailYN(true); e.preventDefault(); }
-          else if (key === 'N') { this._hitDetailYN(false); e.preventDefault(); }
-          else if (key === 'ENTER') { this._step = 'notes'; this.render(); e.preventDefault(); }
         }
         if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
         break;
@@ -610,7 +859,7 @@ export class HitResultPanel {
             d.resultType = enabled[idx].val;
             this.render(); e.preventDefault();
           }
-        } else if (key === 'ENTER') { this._step = 'notes'; this.render(); e.preventDefault(); }
+        } else if (key === 'ENTER') { this._initRunnerOutcomes(); this._step = 'runners'; this.render(); e.preventDefault(); }
         if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
         break;
 
@@ -623,7 +872,7 @@ export class HitResultPanel {
           else if (key === '3') { d.baseReached = 'third'; this.render(); e.preventDefault(); }
           else if (key === '4') { d.baseReached = 'home'; this.render(); e.preventDefault(); }
         } else if (d.errorPosition && d.baseReached && key === 'ENTER') {
-          this._step = 'notes'; this.render(); e.preventDefault();
+          this._initRunnerOutcomes(); this._step = 'runners'; this.render(); e.preventDefault();
         }
         if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
         break;
@@ -631,7 +880,12 @@ export class HitResultPanel {
       case 'fc-detail':
         if (key === 'Y') { d.fcOutOccurred = true; this.render(); e.preventDefault(); }
         else if (key === 'N') { d.fcOutOccurred = false; this.render(); e.preventDefault(); }
-        else if (key === 'ENTER') { d.resultType = 'FC'; this._step = 'notes'; this.render(); e.preventDefault(); }
+        else if (key === 'ENTER') { d.resultType = 'FC'; this._initRunnerOutcomes(); this._step = 'runners'; this.render(); e.preventDefault(); }
+        else if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
+        break;
+
+      case 'runners':
+        if (key === 'ENTER') { this._step = 'notes'; this.render(); e.preventDefault(); }
         else if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
         break;
 
@@ -640,14 +894,6 @@ export class HitResultPanel {
         else if (key === 'ESCAPE') { this._goBack(); e.preventDefault(); }
         break;
     }
-  }
-
-  /** Y/N handler for hit detail: toggles scored question */
-  _hitDetailYN(val) {
-    const d = this._data;
-    // Y/N keyboard toggles the scored question (most common)
-    d.scored = val;
-    this.render();
   }
 
   // ═══════════════════════════════════════════

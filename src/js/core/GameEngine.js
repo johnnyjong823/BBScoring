@@ -244,9 +244,11 @@ export class GameEngine {
       if (fcOutRunner !== undefined) ab.result.fcOutRunner = fcOutRunner;
     }
 
-    // 出局
-    const outsAdded = RulesEngine.getOutsFromResult(type);
-    this.game.currentState.outs += outsAdded;
+    // 出局 — when runnerOverrides provided, outs come from Phase B outcomes
+    if (!runnerOverrides) {
+      const outsAdded = RulesEngine.getOutsFromResult(type);
+      this.game.currentState.outs += outsAdded;
+    }
 
     // 跑壘
     if (!runnerOverrides) {
@@ -269,9 +271,25 @@ export class GameEngine {
 
       this._addRuns(runs);
     } else {
-      // 手動指定跑壘
-      this.runnerMgr.setRunners(runnerOverrides.newRunners);
-      this.recorder.setRunnerMovements(runnerOverrides.movements);
+      // Phase B: manual runner overrides
+      const batterId = this.recorder.getCurrentAtBat().batterId;
+
+      // Replace __batter__ placeholder with actual batterId
+      const nr = { ...runnerOverrides.newRunners };
+      for (const base of ['first', 'second', 'third']) {
+        if (nr[base] === '__batter__') nr[base] = batterId;
+      }
+      const mvts = runnerOverrides.movements.map(m => ({
+        ...m,
+        runnerId: m.runnerId === '__batter__' ? batterId : m.runnerId
+      }));
+
+      // Count outs from movements
+      const outsFromOverrides = mvts.filter(m => m.out).length;
+      this.game.currentState.outs += outsFromOverrides;
+
+      this.runnerMgr.setRunners(nr);
+      this.recorder.setRunnerMovements(mvts);
       this._addRuns(runnerOverrides.runs || 0);
     }
 

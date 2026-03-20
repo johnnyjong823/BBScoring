@@ -700,3 +700,78 @@
 .stats-table td:nth-child(2) {
   text-align: left;
 }
+
+/* === Runner Outcomes (Phase B) === */
+.runner-outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+}
+
+.runner-outcomes__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-primary);
+}
+
+.runner-outcomes__row--batter {
+  border-left-color: var(--color-accent, #ffc107);
+}
+
+.runner-outcomes__label {
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.runner-outcomes__base {
+  display: block;
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+}
+
+.runner-outcomes__name {
+  display: block;
+  font-size: var(--fs-player);
+  font-weight: 600;
+}
+
+.runner-outcomes__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+
+.runner-outcomes__btns .btn {
+  flex: 0 0 auto;
+  font-size: var(--fs-sub);
+  padding: 4px 10px;
+}
+
+.runner-outcomes__summary {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-player);
+  margin-top: var(--space-sm);
+}
+
+.runner-outcomes__summary strong {
+  font-size: var(--fs-button);
+  color: var(--color-primary);
+}
+
+.hit-wizard__runner-hint {
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: var(--space-sm);
+}
