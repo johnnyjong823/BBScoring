@@ -549,7 +549,7 @@ export class HitResultPanel {
       { val: 'out', label: '出局', cls: 'btn--outline', activeCls: 'btn--danger' }
     ];
     if (fromBase === 'home') {
-      // Batter
+      // Batter — generic options (use _getBatterDestOptions for constrained list)
       all.push({ val: 'first', label: '一壘', cls: 'btn--outline', activeCls: 'btn--primary' });
       all.push({ val: 'second', label: '二壘', cls: 'btn--outline', activeCls: 'btn--primary' });
       all.push({ val: 'third', label: '三壘', cls: 'btn--outline', activeCls: 'btn--primary' });
@@ -566,6 +566,60 @@ export class HitResultPanel {
       }
     }
     return all;
+  }
+
+  /** Constrained batter destination options based on result type */
+  _getBatterDestOptions() {
+    const d = this._data;
+    const info = HIT_RESULTS_INFO[d.resultType];
+    const cat = info?.category;
+    const bases = info?.bases || 0;
+    const order = ['first', 'second', 'third', 'home'];
+    const labels = { first: '一壘', second: '二壘', third: '三壘', home: '得分' };
+
+    // OUT/SAC: batter is always out — locked, no other choices
+    if (cat === 'OUT' || cat === 'SAC') {
+      return [{ val: 'out', label: '出局', cls: 'btn--outline', activeCls: 'btn--danger', locked: true }];
+    }
+
+    // HR: batter always scores — locked
+    if (d.resultType === 'HR') {
+      return [{ val: 'home', label: '得分', cls: 'btn--outline', activeCls: 'btn--hit-hr', locked: true }];
+    }
+
+    // HIT (1B/2B/3B/IH/BH): batter reaches at least hit base, can advance further on errors
+    if (cat === 'HIT') {
+      const minIdx = bases - 1; // 1B=0(first), 2B=1(second), 3B=2(third)
+      const opts = [];
+      for (let i = minIdx; i < order.length; i++) {
+        const isScore = order[i] === 'home';
+        opts.push({
+          val: order[i],
+          label: isScore ? '得分' : labels[order[i]],
+          cls: 'btn--outline',
+          activeCls: isScore ? 'btn--hit-hr' : 'btn--primary'
+        });
+      }
+      return opts;
+    }
+
+    // FC/E: batter is safe, can reach first through home, but NOT out
+    if (d.resultType === 'FC' || d.resultType === 'E') {
+      const opts = [];
+      for (let i = 0; i < order.length; i++) {
+        const isScore = order[i] === 'home';
+        opts.push({
+          val: order[i],
+          label: isScore ? '得分' : labels[order[i]],
+          cls: 'btn--outline',
+          activeCls: isScore ? 'btn--hit-hr' : 'btn--primary'
+        });
+      }
+      return opts;
+    }
+
+    // Fallback: all options
+    return this._getDestOptions('home');
   }
 
   _renderRunnersStep() {
@@ -612,13 +666,25 @@ export class HitResultPanel {
       batterLabel.innerHTML = `<span class="runner-outcomes__base">打者</span><span class="runner-outcomes__name">⚾</span>`;
 
       const btns = createElement('div', { className: 'runner-outcomes__btns' });
-      this._getDestOptions('home').forEach(opt => {
+      const batterOpts = this._getBatterDestOptions();
+      const isLocked = batterOpts.length === 1 && batterOpts[0].locked;
+
+      batterOpts.forEach(opt => {
         const selected = outcomes.batter.dest === opt.val;
-        btns.appendChild(createElement('button', {
+        const btn = createElement('button', {
           className: `btn btn--sm ${selected ? opt.activeCls : opt.cls}`,
-          textContent: opt.label,
-          onClick: () => { Vibration.tap(); outcomes.batter.dest = opt.val; this.render(); }
-        }));
+          textContent: opt.label
+        });
+        if (isLocked) {
+          btn.disabled = true;
+          btn.style.opacity = '0.8';
+          btn.style.cursor = 'default';
+          // Force the correct dest
+          outcomes.batter.dest = opt.val;
+        } else {
+          btn.addEventListener('click', () => { Vibration.tap(); outcomes.batter.dest = opt.val; this.render(); });
+        }
+        btns.appendChild(btn);
       });
       batter.append(batterLabel, btns);
       container.appendChild(batter);
