@@ -118,6 +118,9 @@ export class HomeView {
       <button class="home-view__nav-btn home-view__nav-btn--active" data-route="#/">
         <span>🏠</span><span>首頁</span>
       </button>
+      <button class="home-view__nav-btn" data-route="#/tutorial">
+        <span>📖</span><span>教學</span>
+      </button>
       <button class="home-view__nav-btn" data-route="#/settings">
         <span>⚙️</span><span>設定</span>
       </button>

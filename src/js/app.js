@@ -18,6 +18,7 @@ import { HistoryPanel } from './ui/HistoryPanel.js';
 import { createGame } from './models/Game.js';
 import { createTeam } from './models/Team.js';
 import { createPlayer } from './models/Player.js';
+import { TutorialView } from './ui/TutorialView.js';
 import { createElement, showToast, showConfirm, formatDate, formatTime } from './utils/helpers.js';
 import { GAME_STATUS, DEFAULT_SETTINGS, START_MODE, RECORDING_MODE } from './utils/constants.js';
 
@@ -63,7 +64,8 @@ class App {
       .add('#/stats/:id', (p) => this._ensureAuth() && this._renderStats(p.id))
       .add('#/history/:id', (p) => this._ensureAuth() && this._renderHistory(p.id))
       .add('#/tournament', () => this._ensureAuth() && this._renderTournamentList())
-      .add('#/settings', () => this._ensureAuth() && this._renderSettings());
+      .add('#/settings', () => this._ensureAuth() && this._renderSettings())
+      .add('#/tutorial', () => this._renderTutorial());
 
     this.router.start();
 
@@ -288,6 +290,14 @@ class App {
       }
     });
     history.render();
+  }
+
+  _renderTutorial() {
+    const tutorial = new TutorialView({
+      container: this.container,
+      onBack: () => this.router.navigate('#/')
+    });
+    tutorial.render();
   }
 
   _renderSettings() {

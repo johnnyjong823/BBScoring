@@ -1,0 +1,176 @@
+/* ====================================
+   BBScoring - Tutorial Page
+   ==================================== */
+
+.tutorial-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background-color: var(--bg-main);
+}
+
+.tutorial-page__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.tutorial-page__header h3 {
+  font-size: var(--fs-player);
+  margin: 0;
+}
+
+.tutorial-page__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* === Section Cards === */
+
+.tutorial-section {
+  margin-bottom: var(--space-sm);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-panel);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.tutorial-section__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: var(--fs-player);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  text-align: left;
+}
+
+.tutorial-section__header:active {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tutorial-section__header--active {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tutorial-section__icon {
+  font-size: 1.3em;
+  flex-shrink: 0;
+}
+
+.tutorial-section__title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.tutorial-section__arrow {
+  flex-shrink: 0;
+  opacity: 0.5;
+  font-size: 0.9em;
+}
+
+/* === Section Content === */
+
+.tutorial-section__content {
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--fs-small);
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.tutorial-section__content h4 {
+  color: var(--text-primary);
+  font-size: var(--fs-button);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.tutorial-section__content p {
+  margin: 0 0 var(--space-sm) 0;
+}
+
+.tutorial-section__content ul {
+  margin: 0 0 var(--space-sm) 0;
+  padding-left: 1.3em;
+}
+
+.tutorial-section__content ul ul {
+  margin-top: var(--space-xs);
+  margin-bottom: 0;
+}
+
+.tutorial-section__content li {
+  margin-bottom: var(--space-xs);
+}
+
+/* === Tutorial Steps === */
+
+.tutorial-step {
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tutorial-step:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* === Tutorial Table === */
+
+.tutorial-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-sm) 0;
+}
+
+.tutorial-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tutorial-table tr:last-child {
+  border-bottom: none;
+}
+
+.tutorial-table td {
+  padding: var(--space-xs) var(--space-sm);
+  vertical-align: top;
+}
+
+.tutorial-table td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+/* === Key badges === */
+
+.tutorial-key {
+  display: inline-block;
+  background-color: var(--color-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.tutorial-key--hit {
+  background-color: var(--color-strike);
+}
+
+.tutorial-key--out {
+  background-color: var(--color-out);
+}

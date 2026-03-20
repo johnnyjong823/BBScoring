@@ -1211,6 +1211,7 @@ export class LiveRecord {
     const menu = createElement('div', { className: 'menu-drawer open' });
 
     const items = [
+      { label: '📖 操作教學', onClick: () => { window.location.hash = '#/tutorial'; } },
       { label: '更換投手', onClick: () => this._changePitcher() },
       { label: '替補球員', onClick: () => this._substitutePlayer() },
       { label: '結束比賽', onClick: () => this._endGame() },
