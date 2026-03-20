@@ -134,10 +134,11 @@ export class RulesEngine {
       newRunners.first = batterId;
       movements.push({ runnerId: batterId, from: 'home', to: 'first', event: 'HIT', scored: false, earnedRun: false });
     } else if (info.category === 'WALK' || resultType === 'HBP' || resultType === 'IBB' || resultType === 'CI') {
-      // 保送 / 觸身球
+      // 保送 / 觸身球 — use correct event tag
+      const evt = resultType === 'HBP' ? 'HBP' : 'BB';
       if (runners.third) {
         if (runners.second && runners.first) {
-          movements.push({ runnerId: runners.third, from: 'third', to: 'home', event: 'HIT', scored: true, earnedRun: true });
+          movements.push({ runnerId: runners.third, from: 'third', to: 'home', event: evt, scored: true, earnedRun: true });
           runs++;
         } else {
           newRunners.third = runners.third;
@@ -146,27 +147,41 @@ export class RulesEngine {
       if (runners.second) {
         if (runners.first) {
           newRunners.third = newRunners.third || runners.second;
-          movements.push({ runnerId: runners.second, from: 'second', to: 'third', event: 'HIT', scored: false, earnedRun: false });
+          movements.push({ runnerId: runners.second, from: 'second', to: 'third', event: evt, scored: false, earnedRun: false });
         } else {
           newRunners.second = runners.second;
         }
       }
       if (runners.first) {
         newRunners.second = runners.first;
-        movements.push({ runnerId: runners.first, from: 'first', to: 'second', event: 'HIT', scored: false, earnedRun: false });
+        movements.push({ runnerId: runners.first, from: 'first', to: 'second', event: evt, scored: false, earnedRun: false });
       }
       newRunners.first = batterId;
-      movements.push({ runnerId: batterId, from: 'home', to: 'first', event: 'HIT', scored: false, earnedRun: false });
+      movements.push({ runnerId: batterId, from: 'home', to: 'first', event: evt, scored: false, earnedRun: false });
     } else if (info.category === 'OUT' || info.category === 'SAC') {
       // 出局 — 保留跑者（犧牲打可能有人進壘，但簡易版不自動推進）
       newRunners.first = runners.first;
       newRunners.second = runners.second;
       newRunners.third = runners.third;
     } else {
-      // 其他（野手選擇、失誤等）
+      // FC / Error — batter reaches first; runners stay (Phase B will override specifics)
       newRunners.first = batterId;
-      newRunners.second = runners.first || runners.second;
-      newRunners.third = runners.second || runners.third;
+      newRunners.second = runners.second || null;
+      newRunners.third = runners.third || null;
+      // Force-advance: if first was occupied, push chain
+      if (runners.first) {
+        if (!newRunners.second) {
+          newRunners.second = runners.first;
+          movements.push({ runnerId: runners.first, from: 'first', to: 'second', event: 'FC', scored: false, earnedRun: false });
+        } else if (!newRunners.third) {
+          newRunners.third = runners.first;
+          movements.push({ runnerId: runners.first, from: 'first', to: 'third', event: 'FC', scored: false, earnedRun: false });
+        } else {
+          // Bases loaded — first runner forced to home (but keep as stay for Phase B adjustment)
+          newRunners.third = runners.third; // keep third
+        }
+      }
+      movements.push({ runnerId: batterId, from: 'home', to: 'first', event: 'FC', scored: false, earnedRun: false });
     }
 
     return { newRunners, movements, runs };
@@ -183,13 +198,16 @@ export class RulesEngine {
    * 判定比賽是否結束
    */
   static isGameOver(inning, halfInning, totalInnings, awayScore, homeScore) {
+    // After top of final+ inning: if home already leads, no need to bat
+    if (inning >= totalInnings && halfInning === HALF_INNING.TOP && homeScore > awayScore) {
+      return true;
+    }
     // Bottom of regulation or extra inning
     if (inning >= totalInnings && halfInning === HALF_INNING.BOTTOM) {
       // Game over if either team leads (walk-off or regulation end)
       // Continues only if tied (extra innings)
       return awayScore !== homeScore;
     }
-    // After top of any inning: home still bats, game continues
     return false;
   }
 }

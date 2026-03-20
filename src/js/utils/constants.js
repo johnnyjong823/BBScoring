@@ -76,7 +76,7 @@ export const HIT_RESULTS_INFO = {
   TAG:   { name: '觸殺',         category: 'OUT',   outs: 1 },
   SAC:   { name: '犧牲短打',     category: 'SAC',   outs: 1, noAB: true },
   SF:    { name: '犧牲飛球',     category: 'SAC',   outs: 1, noAB: true },
-  FC:    { name: '野手選擇',     category: 'OTHER' },
+  FC:    { name: '野手選擇',     category: 'OTHER', outs: 1 },
   E:     { name: '失誤上壘',     category: 'ERROR' },
   BB:    { name: '四壞保送',     category: 'WALK',  noAB: true },
   HBP:   { name: '觸身球',       category: 'HBP',   noAB: true },

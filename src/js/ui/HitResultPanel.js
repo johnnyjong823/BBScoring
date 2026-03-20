@@ -694,11 +694,40 @@ export class HitResultPanel {
 
     // Auto-calculated summary
     const { runs, rbi, outs } = this._calcFromOutcomes();
+
+    // Validate base collision — warn if two runners assigned to same base
+    const occupiedBases = {};
+    let collision = false;
+    ['third', 'second', 'first'].forEach(base => {
+      const dest = outcomes[base]?.dest;
+      if (dest && dest !== 'out' && dest !== 'stay' && dest !== 'home') {
+        if (occupiedBases[dest]) { collision = true; }
+        occupiedBases[dest] = true;
+      }
+    });
+    if (outcomes.batter) {
+      const dest = outcomes.batter.dest;
+      if (dest && dest !== 'out' && dest !== 'home') {
+        if (occupiedBases[dest]) { collision = true; }
+        occupiedBases[dest] = true;
+      }
+    }
+    if (collision) {
+      frag.appendChild(createElement('div', {
+        className: 'runner-outcomes__warning',
+        textContent: '⚠ 有兩位跑者被分配到同一壘包，請調整！',
+        style: 'color:var(--color-strike);text-align:center;padding:var(--space-sm);font-weight:bold'
+      }));
+    }
+
     const summaryDiv = createElement('div', { className: 'runner-outcomes__summary' });
     summaryDiv.innerHTML = `<span>得分: <strong>${runs}</strong></span> <span>打點: <strong>${rbi}</strong></span> <span>出局: <strong>${outs}</strong></span>`;
     frag.appendChild(summaryDiv);
 
-    frag.appendChild(this._nextBtn(() => { this._step = 'notes'; this.render(); }));
+    frag.appendChild(this._nextBtn(() => {
+      if (collision) { showToast('有壘包衝突，請調整跑壘結果'); return; }
+      this._step = 'notes'; this.render();
+    }));
     return frag;
   }
 
@@ -720,13 +749,13 @@ export class HitResultPanel {
     if (outcomes.batter?.dest === 'home') runs++;
     if (outcomes.batter?.dest === 'out') outs++;
 
-    // RBI: runs scored, except errors don't count RBI, DP/FC usually don't
+    // RBI: runs scored, with exceptions
     let rbi = runs;
-    if (cat === 'ERROR') rbi = 0;
-    if (this._data.resultType === 'DP') rbi = 0;
-    if (this._data.resultType === 'FC') rbi = 0;
-    // SAC bunt: no RBI; SF: RBI counts (both have cat 'SAC')
-    if (this._data.resultType === 'SAC') rbi = 0;
+    if (cat === 'ERROR') rbi = 0; // errors never count RBI
+    // DP: only force-play DPs deny RBI (conservative: allow by default in Phase B since user chose outcomes)
+    // FC: allow RBI (runner scores on fielder's choice)
+    // SAC bunt: allow RBI (squeeze play)
+    // SF: RBI counts (already correct)
 
     return { runs, rbi, outs };
   }

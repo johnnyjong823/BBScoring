@@ -627,6 +627,9 @@ export class LiveRecord {
         if (c.to === 'home') {
           const side = this.engine.game.currentState.battingTeam;
           this.engine.game.currentState.score[side]++;
+          // Track run in half-inning stats
+          const half = this.engine._getCurrentHalfInning();
+          if (half) half.runs++;
         }
       } else {
         this.engine.runnerMgr.removeRunner(base);
@@ -644,6 +647,14 @@ export class LiveRecord {
     // Check for third out — use engine's proper flow
     if (this.engine.game.currentState.outs >= 3) {
       this.engine._finishAtBat();
+    } else {
+      // Walk-off check: steal-home or WP/PB/BK scoring in bottom of final+ inning
+      const st = this.engine.game.currentState;
+      if (st.halfInning === HALF_INNING.BOTTOM &&
+          st.inning >= this.engine.game.info.totalInnings &&
+          st.score.home > st.score.away) {
+        this.engine.endGame();
+      }
     }
 
     this.engine._pushHistory('STEAL_RESULT', beforeState, beforeAtBat, beforeInnings);
@@ -1000,6 +1011,15 @@ export class LiveRecord {
 
     this.engine._pushHistory('WP_PB_ADVANCE', beforeState, beforeAtBat, beforeInnings);
     this.engine._save();
+
+    // Walk-off check after WP/PB scoring
+    const st = this.engine.game.currentState;
+    if (runs > 0 && st.halfInning === HALF_INNING.BOTTOM &&
+        st.inning >= this.engine.game.info.totalInnings &&
+        st.score.home > st.score.away) {
+      this.engine.endGame();
+    }
+
     this._updateDisplay();
     const eventLabel = event === 'WP' ? '暴投' : '捕逸';
     showToast(`${eventLabel}記錄完成`);

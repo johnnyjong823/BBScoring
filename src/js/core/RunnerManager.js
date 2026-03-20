@@ -31,7 +31,7 @@ export class RunnerManager {
     if (this.state.runners.third) {
       movements.push({
         runnerId: this.state.runners.third,
-        from: 'third', to: 'home', event, scored: true, earnedRun: event !== 'ERROR'
+        from: 'third', to: 'home', event, scored: true, earnedRun: event !== 'ERROR' && event !== 'PB'
       });
       runs++;
     }
@@ -125,7 +125,7 @@ export class RunnerManager {
       movements.push({
         runnerId, from, to, event,
         scored,
-        earnedRun: scored && event !== 'ERROR'
+        earnedRun: scored && event !== 'ERROR' && event !== 'PB'
       });
       if (scored) runs++;
     }

@@ -120,16 +120,21 @@ export class GameEngine {
       const hadRunners = this.runnerMgr.hasRunners();
 
       if (hadRunners && (pitchResult === 'WP' || pitchResult === 'PB')) {
-        // WP/PB with runners: defer advancement to UI (modal asks per-runner bases)
-        // Only record the ball count here; UI will call applyCustomAdvancement later
+        // WP/PB with runners: check if this causes a walk first
         this.game.currentState.balls++;
         if (this.game.currentState.balls >= 4) {
+          // Ball 4 walk — process walk, no advancement modal needed
           this.recorder.setWalk();
           const { movements, runs } = this._autoAdvance('BB', this.recorder.getCurrentAtBat().batterId);
           this.recorder.setRunnerMovements(movements);
           this._addRuns(runs);
           this._finishAtBat();
+          this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+          this._save();
+          this.emit('pitchRecorded', { result: pitchResult, endAtBat: true });
+          return;
         }
+        // Not ball 4: defer advancement to UI modal
         this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
         this._save();
         this.emit('pitchRecorded', { result: pitchResult, needsAdvancement: true });
@@ -151,6 +156,24 @@ export class GameEngine {
             description: PITCH_RESULTS_INFO[pitchResult].name
           });
           movements.forEach(m => ab.runnerMovements.push(m));
+        }
+        // Track runs in half-inning stats
+        if (runs > 0) {
+          const half = this._getCurrentHalfInning();
+          if (half) half.runs += runs;
+        }
+        // Walk-off check for BK scoring
+        if (runs > 0) {
+          const st = this.game.currentState;
+          if (st.halfInning === HALF_INNING.BOTTOM &&
+              st.inning >= this.game.info.totalInnings &&
+              st.score.home > st.score.away) {
+            this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
+            this._save();
+            this.endGame();
+            this.emit('pitchRecorded', { result: pitchResult });
+            return;
+          }
         }
       }
 
@@ -212,8 +235,8 @@ export class GameEngine {
     }
 
     if (result === 'STRIKEOUT') {
-      const looking = pitchResult === 'S';
-      // 不死三振條件: 揮空或過半 (非界外觸擊), 且一壘空或兩出局
+      const looking = pitchResult === 'CS';
+      // 不死三振條件: 揮空或觸擊 (非被判好球), 且一壘空或兩出局
       const firstEmpty = !this.game.currentState.runners.first;
       const twoOuts = this.game.currentState.outs >= 2;
       const canDroppedK = !looking && (firstEmpty || twoOuts);
@@ -256,10 +279,29 @@ export class GameEngine {
     if (reached) {
       // 打者跑上一壘 (投手仍記三振，打者不記出局)
       const batterId = this.recorder.getCurrentAtBat().batterId;
+      // If first base is occupied (2-out scenario), force-advance existing runner
+      if (this.game.currentState.runners.first) {
+        const existingRunner = this.game.currentState.runners.first;
+        // Push existing runner to second (or further if second is occupied)
+        if (!this.game.currentState.runners.second) {
+          this.runnerMgr.moveRunner('first', 'second');
+        } else if (!this.game.currentState.runners.third) {
+          this.runnerMgr.moveRunner('first', 'third');
+        }
+        // Record the force-advance movement
+        const ab = this.recorder.getCurrentAtBat();
+        if (ab) {
+          ab.runnerMovements.push({
+            runnerId: existingRunner, from: 'first', to: this.game.currentState.runners.second === existingRunner ? 'second' : 'third',
+            event: 'DROPPED_K', scored: false, earnedRun: false
+          });
+        }
+      }
       this.runnerMgr.placeRunner('first', batterId);
       const ab = this.recorder.getCurrentAtBat();
       if (ab) {
-        ab.result = 'K';
+        // result was already set by setStrikeout() — keep it as-is (proper createHitResult)
+        // Just add the dropped K event
         ab.events.push({
           pitchNumber: ab.pitchCount,
           type: 'DROPPED_K',

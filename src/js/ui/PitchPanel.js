@@ -53,6 +53,7 @@ export class PitchPanel {
         if (key === '1') { this._pendingStrike = PITCH_RESULTS.SWINGING_STRIKE; this._layer = 'strike-wpcheck'; this.render(); e.preventDefault(); }
         else if (key === '2') { this._pendingStrike = PITCH_RESULTS.CALLED_STRIKE; this._layer = 'strike-wpcheck'; this.render(); e.preventDefault(); }
         else if (key === '3') { this._emit(PITCH_RESULTS.FOUL); e.preventDefault(); }
+        else if (key === '4') { this._emit(PITCH_RESULTS.FOUL_BUNT); e.preventDefault(); }
         else if (key === 'ESCAPE') { this._layer = 'main'; this.render(); e.preventDefault(); }
         break;
 
@@ -135,6 +136,7 @@ export class PitchPanel {
       this.render();
     }, '2'));
     primary.appendChild(this._btn('界外', 'btn--lg btn--foul', () => this._emit(PITCH_RESULTS.FOUL), '3'));
+    primary.appendChild(this._btn('界外觸擊', 'btn--sm btn--foul', () => this._emit(PITCH_RESULTS.FOUL_BUNT), '4'));
     frag.appendChild(primary);
 
     // 盜壘 only (WP/PB moved to wpcheck step)
