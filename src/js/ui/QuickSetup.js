@@ -9,7 +9,7 @@
  * Target: 30 seconds from open to first pitch.
  */
 import { createElement, showToast, getTodayStr, getNowTimeStr } from '../utils/helpers.js';
-import { RECORDING_MODE, POSITIONS, POSITION_LIST } from '../utils/constants.js';
+import { RECORDING_MODE, REENTRY_RULE, POSITIONS, POSITION_LIST } from '../utils/constants.js';
 import { createGame } from '../models/Game.js';
 import { createTeam } from '../models/Team.js';
 import { createPlayer } from '../models/Player.js';
@@ -34,6 +34,7 @@ export class QuickSetup {
     this.homeName = '';
     this.totalInnings = null;
     this.recordingMode = '';
+    this.reentryRule = REENTRY_RULE.NONE;
 
     // Step 2 data: arrays of { number, position }
     this.awayLineup = Array.from({ length: 9 }, () => ({ number: '', position: '' }));
@@ -144,6 +145,14 @@ export class QuickSetup {
           </button>
         </div>
       </div>
+      <div class="quick-setup__field">
+        <label class="quick-setup__label">再上場規則</label>
+        <div class="quick-setup__innings-group">
+          <button class="quick-setup__reentry-btn ${this.reentryRule === REENTRY_RULE.NONE ? 'quick-setup__innings-btn--active' : ''}" data-reentry="${REENTRY_RULE.NONE}">不可再上場</button>
+          <button class="quick-setup__reentry-btn ${this.reentryRule === REENTRY_RULE.SAME_SLOT ? 'quick-setup__innings-btn--active' : ''}" data-reentry="${REENTRY_RULE.SAME_SLOT}">限原棒次</button>
+          <button class="quick-setup__reentry-btn ${this.reentryRule === REENTRY_RULE.FREE ? 'quick-setup__innings-btn--active' : ''}" data-reentry="${REENTRY_RULE.FREE}">不限制</button>
+        </div>
+      </div>
     `;
 
     // Event bindings
@@ -161,6 +170,15 @@ export class QuickSetup {
         this.recordingMode = btn.dataset.mode;
         form.querySelectorAll('.quick-setup__mode-btn').forEach(b =>
           b.classList.toggle('quick-setup__mode-btn--active', b === btn)
+        );
+      });
+    });
+
+    form.querySelectorAll('.quick-setup__reentry-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.reentryRule = btn.dataset.reentry;
+        form.querySelectorAll('.quick-setup__reentry-btn').forEach(b =>
+          b.classList.toggle('quick-setup__innings-btn--active', b === btn)
         );
       });
     });
@@ -575,7 +593,8 @@ export class QuickSetup {
       time: getNowTimeStr(),
       totalInnings: this.totalInnings,
       startMode: 'QUICK',
-      recordingMode: this.recordingMode
+      recordingMode: this.recordingMode,
+      reentryRule: this.reentryRule
     });
 
     // Build teams with temporary players

@@ -20,7 +20,7 @@ import { createTeam } from './models/Team.js';
 import { createPlayer } from './models/Player.js';
 import { TutorialView } from './ui/TutorialView.js';
 import { createElement, showToast, showConfirm, formatDate, formatTime } from './utils/helpers.js';
-import { GAME_STATUS, DEFAULT_SETTINGS, START_MODE, RECORDING_MODE } from './utils/constants.js';
+import { GAME_STATUS, DEFAULT_SETTINGS, START_MODE, RECORDING_MODE, REENTRY_RULE } from './utils/constants.js';
 
 class App {
   constructor() {
@@ -151,7 +151,8 @@ class App {
       venue: '測試模式球場',
       totalInnings: 7,
       startMode: START_MODE.QUICK,
-      recordingMode
+      recordingMode,
+      reentryRule: REENTRY_RULE.NONE
     });
 
     game.teams.away = awayTeam;

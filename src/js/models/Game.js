@@ -3,7 +3,7 @@
  */
 import { generateId, getTimestamp, getTodayStr, getNowTimeStr } from '../utils/helpers.js';
 import { createInning } from './Inning.js';
-import { GAME_STATUS, HALF_INNING, START_MODE, RECORDING_MODE, DATA_VERSION } from '../utils/constants.js';
+import { GAME_STATUS, HALF_INNING, START_MODE, RECORDING_MODE, REENTRY_RULE, DATA_VERSION } from '../utils/constants.js';
 
 export function createGame({
   name = '',
@@ -13,7 +13,8 @@ export function createGame({
   totalInnings = 9,
   notes = '',
   startMode = START_MODE.QUICK,
-  recordingMode = RECORDING_MODE.DETAILED
+  recordingMode = RECORDING_MODE.DETAILED,
+  reentryRule = REENTRY_RULE.NONE
 } = {}) {
   const id = generateId('game');
   const now = getTimestamp();
@@ -32,7 +33,8 @@ export function createGame({
 
     mode: {
       startMode,
-      recordingMode
+      recordingMode,
+      reentryRule
     },
 
     // 聯賽關聯 (Tournament 模式用)

@@ -677,7 +677,23 @@ export class GameEngine {
   changePitcher(newPitcherId) {
     if (!this.game) return;
     const side = this.game.currentState.fieldingTeam;
-    this.game.lineups[side].pitcher = { playerId: newPitcherId, isActive: true };
+    const lineup = this.game.lineups[side];
+    const oldPitcherId = lineup.pitcher?.playerId;
+
+    // Record the substitution for reentry tracking
+    if (oldPitcherId && oldPitcherId !== newPitcherId) {
+      lineup.substitutions.push({
+        inning: this.game.currentState.inning,
+        halfInning: this.game.currentState.halfInning,
+        outs: this.game.currentState.outs,
+        type: 'change-pitcher',
+        playerIn: newPitcherId,
+        playerOut: oldPitcherId,
+        position: 'P'
+      });
+    }
+
+    lineup.pitcher = { playerId: newPitcherId, isActive: true };
     this.game.currentState.currentPitcherId = newPitcherId;
     this._save();
     this.emit('pitcherChanged', { side, pitcherId: newPitcherId });

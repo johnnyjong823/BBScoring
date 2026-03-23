@@ -203,6 +203,13 @@ export const HALF_INNING = {
   BOTTOM: 'BOTTOM'
 };
 
+// 再上場規則
+export const REENTRY_RULE = {
+  NONE:          'NONE',           // 不可再上場（預設，正式比賽）
+  SAME_SLOT:     'SAME_SLOT',     // 限原棒次再上場
+  FREE:          'FREE'           // 不限制，自由上下場
+};
+
 // 操作類型（Undo/Redo）
 export const ACTION_TYPES = {
   RECORD_PITCH:        'RECORD_PITCH',

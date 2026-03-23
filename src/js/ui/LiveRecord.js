@@ -4,7 +4,7 @@
  * Supports both Detailed and Result-Only recording modes.
  */
 import { createElement, showToast, showConfirm, deepClone } from '../utils/helpers.js';
-import { GAME_STATUS, HALF_INNING, POSITIONS, RECORDING_MODE } from '../utils/constants.js';
+import { GAME_STATUS, HALF_INNING, POSITIONS, RECORDING_MODE, REENTRY_RULE } from '../utils/constants.js';
 import { StatsCalculator } from '../core/StatsCalculator.js';
 import { PitchPanel } from './PitchPanel.js';
 import { HitResultPanel } from './HitResultPanel.js';
@@ -321,18 +321,65 @@ export class LiveRecord {
     return wrapper;
   }
 
+  /**
+   * Get available substitute players for a given side, respecting reentry rules.
+   * @param {string} side - 'away' or 'home'
+   * @param {number} [targetOrder] - For SAME_SLOT rule, which batting order slot the sub is for
+   * @returns {Array} Available player objects
+   */
+  _getAvailableSubs(side, targetOrder) {
+    const game = this.engine.game;
+    const team = game.teams[side];
+    const lineup = game.lineups[side];
+    const reentryRule = game.mode?.reentryRule || REENTRY_RULE.NONE;
+
+    // Currently active player IDs (in the lineup starters)
+    const activeIds = new Set(
+      lineup.starters.filter(s => s.isActive).map(s => s.playerId)
+    );
+    // Also exclude current active pitcher
+    if (lineup.pitcher?.playerId) {
+      activeIds.add(lineup.pitcher.playerId);
+    }
+
+    // All players who were substituted OUT (removed from the game)
+    const subbedOutIds = new Set(
+      lineup.substitutions.map(sub => sub.playerOut)
+    );
+
+    return team.players.filter(p => {
+      // Can't sub in someone who's already active
+      if (activeIds.has(p.id)) return false;
+
+      // If this player was never subbed out, they're available (bench player)
+      if (!subbedOutIds.has(p.id)) return true;
+
+      // Player was previously subbed out — check reentry rule
+      if (reentryRule === REENTRY_RULE.FREE) {
+        return true;
+      }
+      if (reentryRule === REENTRY_RULE.SAME_SLOT) {
+        // Find the original order this player was in
+        if (targetOrder === undefined) return false;
+        const originalSlot = lineup.substitutions.find(
+          sub => sub.playerOut === p.id
+        );
+        return originalSlot && originalSlot.order === targetOrder;
+      }
+      // NONE — cannot re-enter
+      return false;
+    });
+  }
+
   _pinchHit() {
     const game = this.engine.game;
     const state = game.currentState;
     const side = state.halfInning === HALF_INNING.TOP ? 'away' : 'home';
-    const team = game.teams[side];
     const lineup = game.lineups[side];
     const orderIndex = state.currentBatterIndex;
     const outPlayerId = lineup.starters[orderIndex].playerId;
-    const activeIds = lineup.starters.filter(s => s.isActive).map(s => s.playerId);
 
-    // Also exclude pitcher (fielding side)
-    const available = team.players.filter(p => !activeIds.includes(p.id));
+    const available = this._getAvailableSubs(side, orderIndex);
     if (available.length === 0) {
       showToast('沒有可用的替補球員');
       return;
@@ -386,15 +433,8 @@ export class LiveRecord {
     const team = game.teams[side];
     const lineup = game.lineups[side];
     const runners = state.runners || {};
-    const activeIds = lineup.starters.filter(s => s.isActive).map(s => s.playerId);
-    const available = team.players.filter(p => !activeIds.includes(p.id));
 
-    if (available.length === 0) {
-      showToast('沒有可用的替補球員');
-      return;
-    }
-
-    // Step 1: select which runner to replace
+    // Step 1: find runners on base
     const baseLabels = { first: '一壘', second: '二壘', third: '三壘' };
     const onBase = [];
     for (const [base, playerId] of Object.entries(runners)) {
@@ -408,8 +448,19 @@ export class LiveRecord {
       return;
     }
 
+    // Find order for reentry check — use the runner's lineup slot
+    const getRunnerOrder = (runner) => {
+      const idx = lineup.starters.findIndex(s => s.playerId === runner.playerId);
+      return idx >= 0 ? idx : undefined;
+    };
+
     // If only one runner, skip selection
     if (onBase.length === 1) {
+      const available = this._getAvailableSubs(side, getRunnerOrder(onBase[0]));
+      if (available.length === 0) {
+        showToast('沒有可用的替補球員');
+        return;
+      }
       this._showPinchRunReplace(side, onBase[0], available);
       return;
     }
@@ -427,7 +478,13 @@ export class LiveRecord {
         textContent: label,
         onClick: () => {
           modalOverlay.remove();
-          this._showPinchRunReplace(side, r, available);
+          const runnerOrder = lineup.starters.findIndex(s => s.playerId === r.playerId);
+          const avail = this._getAvailableSubs(side, runnerOrder >= 0 ? runnerOrder : undefined);
+          if (avail.length === 0) {
+            showToast('沒有可用的替補球員');
+            return;
+          }
+          this._showPinchRunReplace(side, r, avail);
         }
       }));
     });
@@ -1491,21 +1548,40 @@ export class LiveRecord {
   }
 
   _changePitcher() {
-    // Use engine's changePitcher — show simple prompt
     const game = this.engine.game;
     const state = game.currentState;
     const defendSide = state.halfInning === HALF_INNING.TOP ? 'home' : 'away';
     const team = game.teams[defendSide];
+    const lineup = game.lineups[defendSide];
+    const currentPitcherId = lineup.pitcher?.playerId;
+
+    // Get available subs for the fielding side (no specific order slot for pitchers)
+    const available = this._getAvailableSubs(defendSide);
+    // Also include active starters (position change to P is allowed)
+    const activeIds = new Set(lineup.starters.filter(s => s.isActive).map(s => s.playerId));
+    const candidates = team.players.filter(p => {
+      if (p.id === currentPitcherId) return false;
+      return available.includes(p) || activeIds.has(p.id);
+    });
+
+    if (candidates.length === 0) {
+      showToast('沒有可用的投手人選');
+      return;
+    }
 
     const modalOverlay = createElement('div', { className: 'modal-overlay active' });
     const modal = createElement('div', { className: 'modal' });
     modal.innerHTML = `<div class="modal__title">換投 (${team.name})</div>`;
 
     const body = createElement('div', { className: 'modal__body scrollable' });
-    team.players.forEach(p => {
+    candidates.forEach(p => {
+      const isActive = activeIds.has(p.id);
+      const label = isActive
+        ? `#${p.number} ${p.name} (場上)`
+        : `#${p.number} ${p.name}`;
       const btn = createElement('button', {
         className: 'btn btn--outline btn--block mb-sm',
-        textContent: `#${p.number} ${p.name}`,
+        textContent: label,
         onClick: () => {
           this.engine.changePitcher(p.id);
           modalOverlay.remove();
@@ -1556,17 +1632,21 @@ export class LiveRecord {
   }
 
   _showSubReplace(side, orderIndex) {
-    const team = this.engine.game.teams[side];
     const lineup = this.engine.game.lineups[side];
-    const activeIds = lineup.starters.filter(s => s.isActive).map(s => s.playerId);
     const outPlayerId = lineup.starters[orderIndex].playerId;
+
+    const available = this._getAvailableSubs(side, orderIndex);
+    if (available.length === 0) {
+      showToast('沒有可用的替補球員');
+      return;
+    }
 
     const modalOverlay = createElement('div', { className: 'modal-overlay active' });
     const modal = createElement('div', { className: 'modal' });
     modal.innerHTML = `<div class="modal__header"><h3>選擇替補球員</h3></div>`;
 
     const body = createElement('div', { className: 'modal__body scrollable' });
-    team.players.filter(p => !activeIds.includes(p.id)).forEach(p => {
+    available.forEach(p => {
       const btn = createElement('button', {
         className: 'btn btn--outline btn--block mb-sm',
         textContent: `#${p.number} ${p.name}`,
