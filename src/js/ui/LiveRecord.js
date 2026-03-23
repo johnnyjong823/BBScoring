@@ -1235,23 +1235,45 @@ export class LiveRecord {
     const overlay = createElement('div', { className: 'overlay open' });
     const menu = createElement('div', { className: 'menu-drawer open' });
 
+    // Header with close button
+    const header = createElement('div', { className: 'menu-drawer__header' });
+    header.appendChild(createElement('span', { className: 'menu-drawer__title', textContent: '⚾ 選單' }));
+    header.appendChild(createElement('button', {
+      className: 'btn btn--icon btn--sm',
+      innerHTML: '✕',
+      onClick: () => { overlay.remove(); menu.remove(); }
+    }));
+    menu.appendChild(header);
+
+    const closeMenu = () => { overlay.remove(); menu.remove(); };
+
     const items = [
-      { label: '📖 操作教學', onClick: () => { window.location.hash = '#/tutorial'; } },
-      { label: '更換投手', onClick: () => this._changePitcher() },
-      { label: '替補球員', onClick: () => this._substitutePlayer() },
-      { label: '結束比賽', onClick: () => this._endGame() },
-      { label: '返回首頁', onClick: () => this._confirmLeave() }
+      { icon: '⚾', label: '更換投手', onClick: () => this._changePitcher() },
+      { icon: '🔄', label: '替補球員', onClick: () => this._substitutePlayer() },
+      { divider: true },
+      { icon: '📖', label: '操作教學', onClick: () => { window.location.hash = '#/tutorial'; } },
+      { divider: true },
+      { icon: '🏁', label: '結束比賽', danger: true, onClick: () => this._endGame() },
+      { icon: '🏠', label: '返回首頁', onClick: () => this._confirmLeave() }
     ];
 
+    const body = createElement('div', { className: 'menu-drawer__body' });
     items.forEach(item => {
-      menu.appendChild(createElement('button', {
-        className: 'menu-drawer__item',
-        textContent: item.label,
-        onClick: () => { overlay.remove(); menu.remove(); item.onClick(); }
-      }));
+      if (item.divider) {
+        body.appendChild(createElement('div', { className: 'menu-drawer__divider' }));
+        return;
+      }
+      const btn = createElement('button', {
+        className: `menu-drawer__item${item.danger ? ' menu-drawer__item--danger' : ''}`,
+        onClick: () => { closeMenu(); item.onClick(); }
+      });
+      btn.appendChild(createElement('span', { className: 'menu-drawer__item-icon', textContent: item.icon }));
+      btn.appendChild(createElement('span', { className: 'menu-drawer__item-label', textContent: item.label }));
+      body.appendChild(btn);
     });
+    menu.appendChild(body);
 
-    overlay.addEventListener('click', () => { overlay.remove(); menu.remove(); });
+    overlay.addEventListener('click', closeMenu);
     this.container.append(overlay, menu);
   }
 
