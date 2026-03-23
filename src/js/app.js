@@ -175,18 +175,34 @@ class App {
 
     const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'P'];
     const baseNumber = side === 'away' ? 1 : 31;
+    const sideLabel = side === 'away' ? '客隊' : '主隊';
+
+    // 9 starters
     team.players = positions.map((position, index) => createPlayer({
       number: String(baseNumber + index).padStart(2, '0'),
-      name: `${side === 'away' ? '客隊' : '主隊'}球員${index + 1}`,
+      name: `${sideLabel}球員${index + 1}`,
       position: [position],
       isTemporary: true
     }));
+
+    // 6 bench players (substitutes)
+    const benchPositions = ['C', 'IF', 'IF', 'OF', 'P', 'P'];
+    const benchLabels = ['替補捕手', '替補內野', '替補內野', '替補外野', '替補投手', '替補投手'];
+    for (let i = 0; i < benchPositions.length; i++) {
+      team.players.push(createPlayer({
+        number: String(baseNumber + 9 + i).padStart(2, '0'),
+        name: `${sideLabel}${benchLabels[i]}${i + 1}`,
+        position: [benchPositions[i]],
+        isTemporary: true
+      }));
+    }
 
     return team;
   }
 
   _createMockLineup(team) {
-    const starters = team.players.map((player, index) => ({
+    // Only first 9 players are starters
+    const starters = team.players.slice(0, 9).map((player, index) => ({
       order: index + 1,
       playerId: player.id,
       position: player.position[0] || '',

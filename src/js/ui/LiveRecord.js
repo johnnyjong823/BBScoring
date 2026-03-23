@@ -1445,7 +1445,7 @@ export class LiveRecord {
     const closeMenu = () => { overlay.remove(); menu.remove(); };
 
     const items = [
-      { icon: '⚾', label: '更換投手', onClick: () => this._changePitcher() },
+      { icon: '⚾', label: '換投', onClick: () => this._changePitcher() },
       { icon: '🔄', label: '替補球員', onClick: () => this._substitutePlayer() },
       { divider: true },
       { icon: '📖', label: '操作教學', onClick: () => { window.location.hash = '#/tutorial'; } },
@@ -1499,7 +1499,7 @@ export class LiveRecord {
 
     const modalOverlay = createElement('div', { className: 'modal-overlay active' });
     const modal = createElement('div', { className: 'modal' });
-    modal.innerHTML = `<div class="modal__header"><h3>更換投手 (${team.name})</h3></div>`;
+    modal.innerHTML = `<div class="modal__title">換投 (${team.name})</div>`;
 
     const body = createElement('div', { className: 'modal__body scrollable' });
     team.players.forEach(p => {
