@@ -280,6 +280,8 @@ export class LiveRecord {
     const starter = lineup.starters[state.currentBatterIndex];
     const team = game.teams[side];
 
+    const wrapper = createElement('div', { className: 'batter-info-row' });
+
     const info = createElement('div', { className: 'batter-info' });
     if (starter) {
       const player = team.players.find(p => p.id === starter.playerId);
@@ -292,7 +294,202 @@ export class LiveRecord {
         `;
       }
     }
-    return info;
+    wrapper.appendChild(info);
+
+    // 代打 / 代跑 按鈕
+    const actions = createElement('div', { className: 'batter-info__actions' });
+
+    const phBtn = createElement('button', {
+      className: 'btn btn--outline btn--sm batter-info__sub-btn',
+      textContent: '代打',
+      onClick: () => this._pinchHit()
+    });
+    actions.appendChild(phBtn);
+
+    // 代跑：壘上有人才顯示
+    const runners = state.runners || {};
+    if (runners.first || runners.second || runners.third) {
+      const prBtn = createElement('button', {
+        className: 'btn btn--outline btn--sm batter-info__sub-btn',
+        textContent: '代跑',
+        onClick: () => this._pinchRun()
+      });
+      actions.appendChild(prBtn);
+    }
+
+    wrapper.appendChild(actions);
+    return wrapper;
+  }
+
+  _pinchHit() {
+    const game = this.engine.game;
+    const state = game.currentState;
+    const side = state.halfInning === HALF_INNING.TOP ? 'away' : 'home';
+    const team = game.teams[side];
+    const lineup = game.lineups[side];
+    const orderIndex = state.currentBatterIndex;
+    const outPlayerId = lineup.starters[orderIndex].playerId;
+    const activeIds = lineup.starters.filter(s => s.isActive).map(s => s.playerId);
+
+    // Also exclude pitcher (fielding side)
+    const available = team.players.filter(p => !activeIds.includes(p.id));
+    if (available.length === 0) {
+      showToast('沒有可用的替補球員');
+      return;
+    }
+
+    const modalOverlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `<div class="modal__title">代打</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">選擇代打球員替換目前打者</p>`;
+
+    const body = createElement('div', { className: 'modal__body', style: 'max-height:50vh;overflow-y:auto' });
+    available.forEach(p => {
+      body.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--full mb-sm',
+        textContent: `#${p.number}  ${p.name || `球員${p.number}`}`,
+        onClick: () => {
+          this.engine.substitutePlayer({
+            type: 'pinch-hit',
+            playerInId: p.id,
+            playerOutId: outPlayerId,
+            order: orderIndex,
+            side
+          });
+          modalOverlay.remove();
+          showToast(`代打：#${p.number} ${p.name || ''} 上場`);
+        }
+      }));
+    });
+
+    modal.appendChild(body);
+    modal.appendChild(createElement('div', {
+      className: 'modal__actions',
+      innerHTML: ''
+    }));
+    const cancelBtn = createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => modalOverlay.remove()
+    });
+    modal.lastChild.appendChild(cancelBtn);
+
+    modalOverlay.appendChild(modal);
+    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
+    this.container.appendChild(modalOverlay);
+  }
+
+  _pinchRun() {
+    const game = this.engine.game;
+    const state = game.currentState;
+    const side = state.halfInning === HALF_INNING.TOP ? 'away' : 'home';
+    const team = game.teams[side];
+    const lineup = game.lineups[side];
+    const runners = state.runners || {};
+    const activeIds = lineup.starters.filter(s => s.isActive).map(s => s.playerId);
+    const available = team.players.filter(p => !activeIds.includes(p.id));
+
+    if (available.length === 0) {
+      showToast('沒有可用的替補球員');
+      return;
+    }
+
+    // Step 1: select which runner to replace
+    const baseLabels = { first: '一壘', second: '二壘', third: '三壘' };
+    const onBase = [];
+    for (const [base, playerId] of Object.entries(runners)) {
+      if (!playerId) continue;
+      const player = team.players.find(p => p.id === playerId);
+      onBase.push({ base, playerId, player });
+    }
+
+    if (onBase.length === 0) {
+      showToast('壘上無跑者');
+      return;
+    }
+
+    // If only one runner, skip selection
+    if (onBase.length === 1) {
+      this._showPinchRunReplace(side, onBase[0], available);
+      return;
+    }
+
+    const modalOverlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `<div class="modal__title">代跑</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">選擇要替換的跑者</p>`;
+
+    const body = createElement('div', { className: 'modal__body' });
+    onBase.forEach(r => {
+      const label = `${baseLabels[r.base]}  #${r.player?.number || '?'} ${r.player?.name || ''}`;
+      body.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--full mb-sm',
+        textContent: label,
+        onClick: () => {
+          modalOverlay.remove();
+          this._showPinchRunReplace(side, r, available);
+        }
+      }));
+    });
+
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => modalOverlay.remove()
+    }));
+    modal.appendChild(body);
+    modal.appendChild(actions);
+    modalOverlay.appendChild(modal);
+    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
+    this.container.appendChild(modalOverlay);
+  }
+
+  _showPinchRunReplace(side, runner, available) {
+    const team = this.engine.game.teams[side];
+    const lineup = this.engine.game.lineups[side];
+    const baseLabels = { first: '一壘', second: '二壘', third: '三壘' };
+
+    const modalOverlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `<div class="modal__title">代跑 — ${baseLabels[runner.base]}</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">選擇代跑球員</p>`;
+
+    const body = createElement('div', { className: 'modal__body', style: 'max-height:50vh;overflow-y:auto' });
+    available.forEach(p => {
+      body.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--full mb-sm',
+        textContent: `#${p.number}  ${p.name || `球員${p.number}`}`,
+        onClick: () => {
+          // Update runner on base before substitute (so _save captures it)
+          this.engine.game.currentState.runners[runner.base] = p.id;
+
+          const orderIndex = lineup.starters.findIndex(s => s.playerId === runner.playerId);
+          this.engine.substitutePlayer({
+            type: 'pinch-run',
+            playerInId: p.id,
+            playerOutId: runner.playerId,
+            order: orderIndex >= 0 ? orderIndex : undefined,
+            side
+          });
+
+          modalOverlay.remove();
+          showToast(`代跑：#${p.number} ${p.name || ''} 上場（${baseLabels[runner.base]}）`);
+        }
+      }));
+    });
+
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => modalOverlay.remove()
+    }));
+    modal.appendChild(body);
+    modal.appendChild(actions);
+    modalOverlay.appendChild(modal);
+    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
+    this.container.appendChild(modalOverlay);
   }
 
   _renderCountDisplay() {

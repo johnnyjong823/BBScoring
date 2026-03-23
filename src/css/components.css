@@ -38,13 +38,39 @@
 }
 
 /* === 打者資訊 === */
-.batter-info {
+.batter-info-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-xs) var(--space-md);
+}
+
+.batter-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   font-size: var(--fs-button);
+}
+
+.batter-info__actions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-left: var(--space-xs);
+}
+
+.batter-info__sub-btn {
+  font-size: var(--fs-small) !important;
+  padding: 2px var(--space-sm) !important;
+  min-height: 28px !important;
+  min-width: unset !important;
+  border-color: var(--text-muted) !important;
+  color: var(--text-muted) !important;
+}
+
+.batter-info__sub-btn:active {
+  background: rgba(255,255,255,0.08) !important;
+  color: var(--text-primary) !important;
 }
 
 .batter-info__order {
