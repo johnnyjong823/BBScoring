@@ -123,7 +123,7 @@ export class GameEngine {
         // WP/PB with runners: check if this causes a walk first
         this.game.currentState.balls++;
         if (this.game.currentState.balls >= 4) {
-          // Ball 4 walk — process walk, no advancement modal needed
+          // Ball 4 walk — process walk first, then show modal for extra runner advancement
           this.recorder.setWalk();
           const { movements, runs } = this._autoAdvance('BB', this.recorder.getCurrentAtBat().batterId);
           this.recorder.setRunnerMovements(movements);
@@ -131,7 +131,8 @@ export class GameEngine {
           this._finishAtBat();
           this._pushHistory(ACTION_TYPES.RECORD_PITCH, beforeState, beforeAtBat, beforeInnings);
           this._save();
-          this.emit('pitchRecorded', { result: pitchResult, endAtBat: true });
+          // Still show advancement modal — runners may advance extra on the misplay
+          this.emit('pitchRecorded', { result: pitchResult, endAtBat: true, needsAdvancement: true });
           return;
         }
         // Not ball 4: defer advancement to UI modal
@@ -156,11 +157,6 @@ export class GameEngine {
             description: PITCH_RESULTS_INFO[pitchResult].name
           });
           movements.forEach(m => ab.runnerMovements.push(m));
-        }
-        // Track runs in half-inning stats
-        if (runs > 0) {
-          const half = this._getCurrentHalfInning();
-          if (half) half.runs += runs;
         }
         // Walk-off check for BK scoring
         if (runs > 0) {
@@ -236,10 +232,12 @@ export class GameEngine {
 
     if (result === 'STRIKEOUT') {
       const looking = pitchResult === 'CS';
-      // 不死三振條件: 揮空或觸擊 (非被判好球), 且一壘空或兩出局
+      // 不死三振條件: 非被判好球、非界外觸擊, 且一壘空或兩出局
+      // FB (foul bunt) on 2 strikes = dead-ball strikeout, no dropped K possible
+      const isFoulBunt = pitchResult === 'FB';
       const firstEmpty = !this.game.currentState.runners.first;
       const twoOuts = this.game.currentState.outs >= 2;
-      const canDroppedK = !looking && (firstEmpty || twoOuts);
+      const canDroppedK = !looking && !isFoulBunt && (firstEmpty || twoOuts);
 
       if (canDroppedK) {
         // 不直接記出局，改由 UI 確認是否為不死三振
@@ -373,6 +371,22 @@ export class GameEngine {
       this.runnerMgr.removeRunner(runnerBase);
       runs = 1;
     } else {
+      // If destination is occupied, force-advance that runner first
+      if (this.game.currentState.runners[advanceTo]) {
+        const BASE_ORDER = ['first', 'second', 'third', 'home'];
+        const destIdx = BASE_ORDER.indexOf(advanceTo);
+        for (let i = destIdx; i < BASE_ORDER.length - 1; i++) {
+          if (this.game.currentState.runners[BASE_ORDER[i]]) {
+            const nextBase = BASE_ORDER[i + 1];
+            if (nextBase === 'home') {
+              this.runnerMgr.removeRunner(BASE_ORDER[i]);
+              runs++;
+            } else {
+              this.runnerMgr.moveRunner(BASE_ORDER[i], nextBase);
+            }
+          }
+        }
+      }
       this.runnerMgr.moveRunner(runnerBase, advanceTo);
     }
     if (runs > 0) this._addRuns(runs);

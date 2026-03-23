@@ -41,12 +41,13 @@ const OUT_OPTIONS = [
 ];
 
 export class HitResultPanel {
-  constructor({ container, onResult, onCancel, hasRunners, runners }) {
+  constructor({ container, onResult, onCancel, hasRunners, runners, outs }) {
     this.container = container;
     this.onResult = onResult;
     this.onCancel = onCancel;
     this.hasRunners = hasRunners || false;
     this.runners = runners || { first: null, second: null, third: null };
+    this.outs = outs || 0;
 
     this._step = 'type';
     this._data = this._freshData();
@@ -331,10 +332,17 @@ export class HitResultPanel {
 
       OUT_OPTIONS.forEach(o => {
         let ok = o.compatible.includes(d.hitType);
-        // Filter DP/TP/SF/SAC based on runner count
+        // Filter DP/TP/SF/SAC/IF based on runner count and out count
         const runnerCount = this._runnerCount;
-        if (o.val === 'DP' || o.val === 'SF' || o.val === 'SAC') { if (runnerCount < 1) ok = false; }
-        if (o.val === 'TP') { if (runnerCount < 2) ok = false; }
+        if (o.val === 'DP') { if (runnerCount < 1 || this.outs >= 2) ok = false; }
+        if (o.val === 'TP') { if (runnerCount < 2 || this.outs >= 1) ok = false; }
+        if (o.val === 'SF') { if (!this.runners.third) ok = false; }
+        if (o.val === 'SAC') { if (runnerCount < 1) ok = false; }
+        // IF (infield fly): requires runners on 1st+2nd (or loaded), <2 outs
+        if (o.val === 'IF') {
+          const has1and2 = !!this.runners.first && !!this.runners.second;
+          if (!has1and2 || this.outs >= 2) ok = false;
+        }
 
         grid.appendChild(createElement('button', {
           className: `btn btn--sm ${ok ? 'btn--out' : 'btn--outline hit-wizard__disabled'}`,
@@ -450,7 +458,10 @@ export class HitResultPanel {
       frag.appendChild(grid);
     }
 
-    frag.appendChild(this._nextBtn(() => { d.resultType = 'FC'; this._initRunnerOutcomes(); this._step = 'runners'; this.render(); }));
+    frag.appendChild(this._nextBtn(() => {
+      if (d.fcOutOccurred && !d.fcOutRunner) { showToast('請選擇出局的跑者'); return; }
+      d.resultType = 'FC'; this._initRunnerOutcomes(); this._step = 'runners'; this.render();
+    }));
     return frag;
   }
 
@@ -978,8 +989,11 @@ export class HitResultPanel {
           const enabled = OUT_OPTIONS.filter(o => {
             const typeOk = o.compatible.includes(d.hitType);
             let runnerOk = true;
-            if (o.val === 'DP' || o.val === 'SF' || o.val === 'SAC') runnerOk = runnerCount >= 1;
-            if (o.val === 'TP') runnerOk = runnerCount >= 2;
+            if (o.val === 'DP') runnerOk = runnerCount >= 1 && this.outs < 2;
+            if (o.val === 'TP') runnerOk = runnerCount >= 2 && this.outs < 1;
+            if (o.val === 'SF') runnerOk = !!this.runners.third;
+            if (o.val === 'SAC') runnerOk = runnerCount >= 1;
+            if (o.val === 'IF') runnerOk = !!this.runners.first && !!this.runners.second && this.outs < 2;
             return typeOk && runnerOk;
           });
           const idx = parseInt(key) - 1;

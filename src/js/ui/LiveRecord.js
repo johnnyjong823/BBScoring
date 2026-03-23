@@ -179,7 +179,8 @@ export class LiveRecord {
         onResult: (result) => this._handleHitResult(result),
         onCancel: () => this._hideHitPanel(),
         hasRunners: hitHasRunners,
-        runners: this.engine.getRunnersInfo()
+        runners: this.engine.getRunnersInfo(),
+        outs: game.currentState.outs
       });
       layout.appendChild(hitContainer);
     }
@@ -622,6 +623,10 @@ export class LiveRecord {
             runnerId: c.id, from: base, to: c.to,
             description: `盜壘成功 ${base}→${c.to}${r.errorAdvance ? ' (失誤進壘)' : ''}`
           });
+          ab.runnerMovements.push({
+            runnerId: c.id, from: base, to: c.to, event: 'SB',
+            scored: c.to === 'home', earnedRun: c.to === 'home'
+          });
         }
         // Steal home = score a run
         if (c.to === 'home') {
@@ -639,6 +644,10 @@ export class LiveRecord {
             pitchNumber: ab.pitchCount, type: 'CS',
             runnerId: c.id, from: base, to: c.to,
             description: `盜壘失敗 ${base}`
+          });
+          ab.runnerMovements.push({
+            runnerId: c.id, from: base, to: base, event: 'CS',
+            scored: false, earnedRun: false, out: true
           });
         }
       }
