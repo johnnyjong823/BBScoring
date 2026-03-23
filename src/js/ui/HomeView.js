@@ -74,8 +74,6 @@ export class HomeView {
     wrapper.appendChild(fixedTop);
 
     // ── Scrollable Game List Section ──
-    const scrollArea = createElement('div', 'home-view__scroll');
-
     const allGames = await this._loadGames();
     const inProgress = allGames.filter(
       g => g.info && g.info.status === GAME_STATUS.IN_PROGRESS
@@ -84,40 +82,50 @@ export class HomeView {
       g => g.info && g.info.status === GAME_STATUS.FINISHED
     );
 
-    if (inProgress.length > 0) {
-      const section = createElement('div', 'home-view__section');
-      section.innerHTML = `<h2 class="home-view__section-title">🔴 進行中比賽</h2>`;
-      const list = createElement('div', 'home-view__game-list');
-      for (const game of inProgress) {
-        list.appendChild(this._createGameCard(game, true));
+    if (inProgress.length > 0 || completed.length > 0) {
+      // In-progress block
+      if (inProgress.length > 0) {
+        const block = createElement('div', 'home-view__list-block');
+        block.appendChild(createElement('h2', {
+          className: 'home-view__section-title',
+          innerHTML: '🔴 進行中比賽'
+        }));
+        const scrollArea = createElement('div', 'home-view__scroll');
+        const list = createElement('div', 'home-view__game-list');
+        for (const game of inProgress) {
+          list.appendChild(this._createGameCard(game, true));
+        }
+        scrollArea.appendChild(list);
+        block.appendChild(scrollArea);
+        wrapper.appendChild(block);
       }
-      section.appendChild(list);
-      scrollArea.appendChild(section);
-    }
 
-    if (completed.length > 0) {
-      const section = createElement('div', 'home-view__section');
-      section.innerHTML = `<h2 class="home-view__section-title">📋 最近比賽</h2>`;
-      const list = createElement('div', 'home-view__game-list');
-      const recent = completed.slice(0, 5);
-      for (const game of recent) {
-        list.appendChild(this._createGameCard(game, false));
+      // Completed block
+      if (completed.length > 0) {
+        const block = createElement('div', 'home-view__list-block');
+        block.appendChild(createElement('h2', {
+          className: 'home-view__section-title',
+          innerHTML: '📋 最近比賽'
+        }));
+        const scrollArea = createElement('div', 'home-view__scroll');
+        const list = createElement('div', 'home-view__game-list');
+        const recent = completed.slice(0, 5);
+        for (const game of recent) {
+          list.appendChild(this._createGameCard(game, false));
+        }
+        scrollArea.appendChild(list);
+        block.appendChild(scrollArea);
+        wrapper.appendChild(block);
       }
-      section.appendChild(list);
-      scrollArea.appendChild(section);
-    }
-
-    if (inProgress.length === 0 && completed.length === 0) {
+    } else {
       const empty = createElement('div', 'home-view__empty');
       empty.innerHTML = `
         <p class="home-view__empty-icon">📝</p>
         <p class="home-view__empty-text">尚無比賽紀錄</p>
         <p class="home-view__empty-hint">點擊上方按鈕開始記錄比賽</p>
       `;
-      scrollArea.appendChild(empty);
+      wrapper.appendChild(empty);
     }
-
-    wrapper.appendChild(scrollArea);
 
     // ── Bottom Nav ──
     const nav = createElement('nav', 'home-view__nav');

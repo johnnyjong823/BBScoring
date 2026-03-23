@@ -17,12 +17,30 @@
   flex-shrink: 0;
 }
 
+.home-view__list-block {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--space-md);
+}
+
+.home-view__list-block + .home-view__list-block {
+  flex: none;
+  max-height: 40%;
+}
+
+.home-view__list-block .home-view__section-title {
+  flex-shrink: 0;
+  padding: var(--space-sm) 0;
+}
+
 .home-view__scroll {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
 }
 
 .home-view__header {
