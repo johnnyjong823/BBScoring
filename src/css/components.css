@@ -1021,17 +1021,164 @@
 }
 
 /* === 設定頁 === */
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.settings-page__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-panel);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 48px;
+  flex-shrink: 0;
+}
+
+.settings-page__header h3 {
+  font-size: var(--fs-button);
+  font-weight: 700;
+  margin: 0;
+}
+
+.settings-page__body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-md);
+  padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom, 0px));
+}
+
 .settings-section {
-  margin-bottom: var(--space-xl);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  margin-bottom: var(--space-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .settings-section__title {
-  font-size: var(--fs-sub);
+  font-size: var(--fs-small);
   color: var(--text-muted);
   font-weight: 700;
-  margin-bottom: var(--space-md);
+  padding: var(--space-md) var(--space-md) var(--space-xs);
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+.settings-section__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  min-height: var(--touch-min);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-section__row:first-of-type {
+  border-top: none;
+}
+
+.settings-section__row-label {
+  font-size: var(--fs-player);
+  color: var(--text-primary);
+}
+
+.settings-section__row-desc {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.settings-section__content {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+}
+
+.settings-section__about {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  font-size: var(--fs-sub);
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.settings-section__danger-zone {
+  padding: var(--space-md);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Toggle 開關 */
+.toggle {
+  width: 52px;
+  height: 30px;
+  background-color: var(--bg-input);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.toggle.active {
+  background-color: var(--color-primary-light);
+  border-color: var(--color-primary-light);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background-color: #fff;
+  border-radius: var(--radius-round);
+  top: 2px;
+  left: 2px;
+  transition: transform var(--transition-fast);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle.active::after {
+  transform: translateX(22px);
+}
+
+/* 字型大小選項 */
+.settings-font-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+}
+
+.settings-font-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--bg-input);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: var(--touch-min);
+}
+
+.settings-font-btn.selected {
+  border-color: var(--color-primary-light);
+  background: rgba(41, 128, 185, 0.15);
+  color: var(--color-primary-light);
+}
+
+.settings-font-btn__preview {
+  font-weight: 700;
+}
+
+.settings-font-btn__label {
+  font-size: var(--fs-small);
 }
 
 .settings-item {
@@ -1044,37 +1191,6 @@
 
 .settings-item__label {
   font-size: var(--fs-player);
-}
-
-/* Toggle 開關 */
-.toggle {
-  width: 48px;
-  height: 28px;
-  background-color: var(--bg-input);
-  border-radius: 14px;
-  position: relative;
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.toggle.active {
-  background-color: var(--color-primary-light);
-}
-
-.toggle::after {
-  content: '';
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  background-color: #fff;
-  border-radius: var(--radius-round);
-  top: 3px;
-  left: 3px;
-  transition: transform var(--transition-fast);
-}
-
-.toggle.active::after {
-  transform: translateX(20px);
 }
 
 /* === 數據統計 === */

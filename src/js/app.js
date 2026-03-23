@@ -304,22 +304,26 @@ class App {
     this.container.innerHTML = '';
     const page = createElement('div', { className: 'settings-page' });
 
+    // ── Header ──
     const header = createElement('div', { className: 'settings-page__header' });
     header.appendChild(createElement('button', {
       className: 'btn btn--icon', innerHTML: '◀',
       onClick: () => this.router.navigate('#/')
     }));
-    header.appendChild(createElement('h3', { textContent: '設定' }));
+    header.appendChild(createElement('h3', { textContent: '⚙️ 設定' }));
     page.appendChild(header);
 
-    const body = createElement('div', { className: 'settings-page__body scrollable' });
+    const body = createElement('div', { className: 'settings-page__body' });
 
-    // 主題
+    // ── 外觀 ──
     const themeSection = createElement('div', { className: 'settings-section' });
-    themeSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '外觀' }));
+    themeSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '🎨 外觀' }));
 
     const themeRow = createElement('div', { className: 'settings-section__row' });
-    themeRow.appendChild(createElement('span', { textContent: '深色模式' }));
+    const themeLabel = createElement('div');
+    themeLabel.appendChild(createElement('div', { className: 'settings-section__row-label', textContent: '深色模式' }));
+    themeLabel.appendChild(createElement('div', { className: 'settings-section__row-desc', textContent: this.settings.darkMode ? '已開啟' : '已關閉' }));
+    themeRow.appendChild(themeLabel);
     const themeToggle = createElement('button', {
       className: `toggle${this.settings.darkMode ? ' active' : ''}`,
       onClick: () => {
@@ -329,16 +333,50 @@ class App {
         this._renderSettings();
       }
     });
-    themeToggle.appendChild(createElement('span', { className: 'toggle__thumb' }));
     themeRow.appendChild(themeToggle);
     themeSection.appendChild(themeRow);
     body.appendChild(themeSection);
 
-    // 震動
+    // ── 字型大小 ──
+    const fontSection = createElement('div', { className: 'settings-section' });
+    fontSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '🔤 字型大小' }));
+    const fontContent = createElement('div', { className: 'settings-section__content' });
+    const fontOptions = createElement('div', { className: 'settings-font-options' });
+    [
+      { key: 'small', label: '小', preview: 'A', size: '0.85rem' },
+      { key: 'medium', label: '中', preview: 'A', size: '1rem' },
+      { key: 'large', label: '大', preview: 'A', size: '1.2rem' }
+    ].forEach(opt => {
+      const btn = createElement('button', {
+        className: `settings-font-btn${this.settings.fontSize === opt.key ? ' selected' : ''}`,
+        onClick: () => {
+          this.settings.fontSize = opt.key;
+          document.documentElement.setAttribute('data-font-size', opt.key);
+          this.storage.saveSettings(this.settings);
+          this._renderSettings();
+        }
+      });
+      btn.appendChild(createElement('span', {
+        className: 'settings-font-btn__preview',
+        textContent: opt.preview,
+        style: `font-size: ${opt.size}`
+      }));
+      btn.appendChild(createElement('span', { className: 'settings-font-btn__label', textContent: opt.label }));
+      fontOptions.appendChild(btn);
+    });
+    fontContent.appendChild(fontOptions);
+    fontSection.appendChild(fontContent);
+    body.appendChild(fontSection);
+
+    // ── 回饋 ──
     const vibeSection = createElement('div', { className: 'settings-section' });
-    vibeSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '回饋' }));
+    vibeSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '📳 回饋' }));
+
     const vibeRow = createElement('div', { className: 'settings-section__row' });
-    vibeRow.appendChild(createElement('span', { textContent: '觸覺震動' }));
+    const vibeLabel = createElement('div');
+    vibeLabel.appendChild(createElement('div', { className: 'settings-section__row-label', textContent: '觸覺震動' }));
+    vibeLabel.appendChild(createElement('div', { className: 'settings-section__row-desc', textContent: '按鈕點擊時震動回饋' }));
+    vibeRow.appendChild(vibeLabel);
     const vibeToggle = createElement('button', {
       className: `toggle${this.settings.vibration ? ' active' : ''}`,
       onClick: () => {
@@ -347,37 +385,17 @@ class App {
         this._renderSettings();
       }
     });
-    vibeToggle.appendChild(createElement('span', { className: 'toggle__thumb' }));
     vibeRow.appendChild(vibeToggle);
     vibeSection.appendChild(vibeRow);
     body.appendChild(vibeSection);
 
-    // 字型大小
-    const fontSection = createElement('div', { className: 'settings-section' });
-    fontSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '字型大小' }));
-    const fontOptions = createElement('div', { className: 'option-group' });
-    ['small', 'medium', 'large'].forEach(size => {
-      const labels = { small: '小', medium: '中', large: '大' };
-      fontOptions.appendChild(createElement('button', {
-        className: `option-btn${this.settings.fontSize === size ? ' selected' : ''}`,
-        textContent: labels[size],
-        onClick: () => {
-          this.settings.fontSize = size;
-          document.documentElement.setAttribute('data-font-size', size);
-          this.storage.saveSettings(this.settings);
-          this._renderSettings();
-        }
-      }));
-    });
-    fontSection.appendChild(fontOptions);
-    body.appendChild(fontSection);
-
-    // 清除資料
+    // ── 資料管理 ──
     const dangerSection = createElement('div', { className: 'settings-section' });
-    dangerSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '資料管理' }));
-    dangerSection.appendChild(createElement('button', {
-      className: 'btn btn--danger btn--sm',
-      textContent: '清除所有比賽記錄',
+    dangerSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '🗂️ 資料管理' }));
+    const dangerZone = createElement('div', { className: 'settings-section__danger-zone' });
+    dangerZone.appendChild(createElement('button', {
+      className: 'btn btn--danger btn--full',
+      textContent: '🗑️ 清除所有比賽記錄',
       onClick: async () => {
         const ok = await showConfirm('確定要清除所有比賽記錄嗎？此操作無法復原。');
         if (ok) {
@@ -386,15 +404,18 @@ class App {
         }
       }
     }));
+    dangerSection.appendChild(dangerZone);
     body.appendChild(dangerSection);
 
-    // 關於
+    // ── 關於 ──
     const aboutSection = createElement('div', { className: 'settings-section' });
-    aboutSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '關於' }));
-    aboutSection.innerHTML += `
-      <div class="text-secondary">BBScoring v2.0.0</div>
-      <div class="text-secondary">棒球計分助手 — 離線可用的 PWA 應用程式</div>
+    aboutSection.appendChild(createElement('div', { className: 'settings-section__title', textContent: '💡 關於' }));
+    const aboutContent = createElement('div', { className: 'settings-section__about' });
+    aboutContent.innerHTML = `
+      <div style="font-weight:700; font-size:1rem; margin-bottom:4px;">⚾ BBScoring v2.0.0</div>
+      <div>棒球計分助手 — 離線可用的 PWA 應用程式</div>
     `;
+    aboutSection.appendChild(aboutContent);
     body.appendChild(aboutSection);
 
     page.appendChild(body);
