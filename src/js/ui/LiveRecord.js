@@ -195,8 +195,7 @@ export class LiveRecord {
     if (this._swipeHandler) this.container.removeEventListener('swipe', this._swipeHandler);
     this._swipeHandler = (e) => {
       if (e.detail.direction === 'right') {
-        if (this.onBack) { this.onBack(); }
-        else { window.location.hash = '#/'; }
+        this._confirmLeave();
       }
     };
     this._gesture = new GestureHandler(this.container);
@@ -213,10 +212,7 @@ export class LiveRecord {
       className: 'btn btn--icon btn--sm status-bar__back',
       innerHTML: '←',
       title: '返回首頁',
-      onClick: () => {
-        if (this.onBack) { this.onBack(); }
-        else { window.location.hash = '#/'; }
-      }
+      onClick: () => this._confirmLeave()
     });
     bar.appendChild(backBtn);
 
@@ -1244,7 +1240,7 @@ export class LiveRecord {
       { label: '更換投手', onClick: () => this._changePitcher() },
       { label: '替補球員', onClick: () => this._substitutePlayer() },
       { label: '結束比賽', onClick: () => this._endGame() },
-      { label: '返回首頁', onClick: () => { if (this.onBack) this.onBack('home'); } }
+      { label: '返回首頁', onClick: () => this._confirmLeave() }
     ];
 
     items.forEach(item => {
@@ -1257,6 +1253,14 @@ export class LiveRecord {
 
     overlay.addEventListener('click', () => { overlay.remove(); menu.remove(); });
     this.container.append(overlay, menu);
+  }
+
+  async _confirmLeave() {
+    const confirmed = await showConfirm('確定要返回首頁嗎？\n比賽進度已自動儲存，可隨時繼續。');
+    if (confirmed) {
+      if (this.onBack) this.onBack('home');
+      else window.location.hash = '#/';
+    }
   }
 
   async _endGame() {
