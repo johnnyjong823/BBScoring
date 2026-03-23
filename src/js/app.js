@@ -53,19 +53,22 @@ class App {
       console.warn('Storage init warning:', e);
     }
 
+    // 建立全域底部導航列
+    this._createGlobalNav();
+
     // 設定路由
     this.router
-      .add('#/', () => this._renderEntry())
-      .add('#/auth', () => this._renderAuth())
-      .add('#/quick-setup', () => this._ensureAuth() && this._renderQuickSetup())
-      .add('#/setup', () => this._ensureAuth() && this._renderSetup())
-      .add('#/setup/:id', (p) => this._ensureAuth() && this._renderSetup(p.id))
-      .add('#/live/:id', (p) => this._ensureAuth() && this._renderLive(p.id))
-      .add('#/stats/:id', (p) => this._ensureAuth() && this._renderStats(p.id))
-      .add('#/history/:id', (p) => this._ensureAuth() && this._renderHistory(p.id))
-      .add('#/tournament', () => this._ensureAuth() && this._renderTournamentList())
-      .add('#/settings', () => this._ensureAuth() && this._renderSettings())
-      .add('#/tutorial', () => this._renderTutorial());
+      .add('#/', () => { this._showNav('#/'); this._renderEntry(); })
+      .add('#/auth', () => { this._hideNav(); this._renderAuth(); })
+      .add('#/quick-setup', () => { this._hideNav(); this._ensureAuth() && this._renderQuickSetup(); })
+      .add('#/setup', () => { this._hideNav(); this._ensureAuth() && this._renderSetup(); })
+      .add('#/setup/:id', (p) => { this._hideNav(); this._ensureAuth() && this._renderSetup(p.id); })
+      .add('#/live/:id', (p) => { this._hideNav(); this._ensureAuth() && this._renderLive(p.id); })
+      .add('#/stats/:id', (p) => { this._hideNav(); this._ensureAuth() && this._renderStats(p.id); })
+      .add('#/history/:id', (p) => { this._hideNav(); this._ensureAuth() && this._renderHistory(p.id); })
+      .add('#/tournament', () => { this._showNav('#/tournament'); this._ensureAuth() && this._renderTournamentList(); })
+      .add('#/settings', () => { this._showNav('#/settings'); this._ensureAuth() && this._renderSettings(); })
+      .add('#/tutorial', () => { this._showNav('#/tutorial'); this._renderTutorial(); });
 
     this.router.start();
 
@@ -445,6 +448,46 @@ class App {
     page.appendChild(body);
 
     this.container.appendChild(page);
+  }
+
+  // ==================
+  // 全域底部導航
+  // ==================
+
+  _createGlobalNav() {
+    this._globalNav = createElement('nav', { className: 'global-nav', id: 'global-nav' });
+    this._globalNav.innerHTML = `
+      <button class="global-nav__btn" data-route="#/">
+        <span class="global-nav__icon">🏠</span><span class="global-nav__label">首頁</span>
+      </button>
+      <button class="global-nav__btn" data-route="#/tutorial">
+        <span class="global-nav__icon">📖</span><span class="global-nav__label">教學</span>
+      </button>
+      <button class="global-nav__btn" data-route="#/settings">
+        <span class="global-nav__icon">⚙️</span><span class="global-nav__label">設定</span>
+      </button>
+    `;
+    this._globalNav.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-route]');
+      if (btn) this.router.navigate(btn.dataset.route);
+    });
+    this._globalNav.style.display = 'none';
+    document.body.appendChild(this._globalNav);
+  }
+
+  _showNav(activeRoute) {
+    if (!this._globalNav) return;
+    this._globalNav.style.display = '';
+    this.container.classList.add('has-global-nav');
+    this._globalNav.querySelectorAll('.global-nav__btn').forEach(btn => {
+      btn.classList.toggle('global-nav__btn--active', btn.dataset.route === activeRoute);
+    });
+  }
+
+  _hideNav() {
+    if (!this._globalNav) return;
+    this._globalNav.style.display = 'none';
+    this.container.classList.remove('has-global-nav');
   }
 
   // ==================

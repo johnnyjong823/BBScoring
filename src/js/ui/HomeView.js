@@ -127,25 +127,6 @@ export class HomeView {
       wrapper.appendChild(empty);
     }
 
-    // ── Bottom Nav ──
-    const nav = createElement('nav', 'home-view__nav');
-    nav.innerHTML = `
-      <button class="home-view__nav-btn home-view__nav-btn--active" data-route="#/">
-        <span>🏠</span><span>首頁</span>
-      </button>
-      <button class="home-view__nav-btn" data-route="#/tutorial">
-        <span>📖</span><span>教學</span>
-      </button>
-      <button class="home-view__nav-btn" data-route="#/settings">
-        <span>⚙️</span><span>設定</span>
-      </button>
-    `;
-    nav.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-route]');
-      if (btn) this.navigate(btn.dataset.route);
-    });
-    wrapper.appendChild(nav);
-
     this.container.appendChild(wrapper);
   }
 
