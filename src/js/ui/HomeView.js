@@ -31,20 +31,23 @@ export class HomeView {
 
     const wrapper = createElement('div', 'home-view');
 
-    // ── Header ──
+    // ── Fixed Top Section ──
+    const fixedTop = createElement('div', 'home-view__fixed');
+
+    // Header
     const header = createElement('div', 'home-view__header');
     header.innerHTML = `
       <h1 class="home-view__title">⚾ BBScoring</h1>
       <p class="home-view__subtitle">${this._getHeaderSubtitle()}</p>
     `;
     header.appendChild(this._createAuthBar());
-    wrapper.appendChild(header);
+    fixedTop.appendChild(header);
 
     if (this.authSession?.mode === 'guest') {
-      wrapper.appendChild(this._createGuestNotice());
+      fixedTop.appendChild(this._createGuestNotice());
     }
 
-    // ── Mode Entry Buttons ──
+    // Mode Entry Buttons
     const actions = createElement('div', 'home-view__actions');
 
     const quickBtn = createElement('button', 'home-view__action-btn home-view__action-btn--quick');
@@ -65,10 +68,14 @@ export class HomeView {
 
     actions.appendChild(quickBtn);
     actions.appendChild(tournamentBtn);
-    wrapper.appendChild(actions);
-    wrapper.appendChild(this._createTestModeSection());
+    fixedTop.appendChild(actions);
+    fixedTop.appendChild(this._createTestModeSection());
 
-    // ── In-progress Games ──
+    wrapper.appendChild(fixedTop);
+
+    // ── Scrollable Game List Section ──
+    const scrollArea = createElement('div', 'home-view__scroll');
+
     const allGames = await this._loadGames();
     const inProgress = allGames.filter(
       g => g.info && g.info.status === GAME_STATUS.IN_PROGRESS
@@ -85,10 +92,9 @@ export class HomeView {
         list.appendChild(this._createGameCard(game, true));
       }
       section.appendChild(list);
-      wrapper.appendChild(section);
+      scrollArea.appendChild(section);
     }
 
-    // ── Recent Games ──
     if (completed.length > 0) {
       const section = createElement('div', 'home-view__section');
       section.innerHTML = `<h2 class="home-view__section-title">📋 最近比賽</h2>`;
@@ -98,10 +104,9 @@ export class HomeView {
         list.appendChild(this._createGameCard(game, false));
       }
       section.appendChild(list);
-      wrapper.appendChild(section);
+      scrollArea.appendChild(section);
     }
 
-    // ── Empty State ──
     if (inProgress.length === 0 && completed.length === 0) {
       const empty = createElement('div', 'home-view__empty');
       empty.innerHTML = `
@@ -109,8 +114,10 @@ export class HomeView {
         <p class="home-view__empty-text">尚無比賽紀錄</p>
         <p class="home-view__empty-hint">點擊上方按鈕開始記錄比賽</p>
       `;
-      wrapper.appendChild(empty);
+      scrollArea.appendChild(empty);
     }
+
+    wrapper.appendChild(scrollArea);
 
     // ── Bottom Nav ──
     const nav = createElement('nav', 'home-view__nav');

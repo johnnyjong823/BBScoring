@@ -11,9 +11,18 @@
   flex-direction: column;
   height: 100%;
   padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+.home-view__fixed {
+  flex-shrink: 0;
+}
+
+.home-view__scroll {
+  flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  padding-bottom: var(--space-md);
 }
 
 .home-view__header {
