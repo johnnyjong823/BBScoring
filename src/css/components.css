@@ -1343,3 +1343,178 @@
   text-align: center;
   margin-bottom: var(--space-sm);
 }
+
+/* ══════════════════════════════════════════════════
+   Defense Manager — 守備調度面板
+   ══════════════════════════════════════════════════ */
+
+.defense-mgr-overlay {
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.defense-mgr {
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  width: 92vw;
+  max-width: 420px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.35);
+  overflow: hidden;
+}
+
+.defense-mgr__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--bg-input);
+  flex-shrink: 0;
+}
+
+.defense-mgr__title {
+  font-weight: 700;
+  font-size: var(--fs-button);
+  color: var(--text-primary);
+}
+
+.defense-mgr__hint {
+  padding: var(--space-xs) var(--space-md);
+  background: rgba(var(--color-primary-rgb, 52,152,219), .12);
+  color: var(--color-primary);
+  font-size: var(--fs-sub);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.defense-mgr__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-xs) 0;
+}
+
+.defense-mgr__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--bg-input);
+  transition: background .15s;
+}
+
+.defense-mgr__row:last-child {
+  border-bottom: none;
+}
+
+.defense-mgr__row--pitcher {
+  background: rgba(var(--color-primary-rgb, 52,152,219), .08);
+}
+
+.defense-mgr__pos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  font-weight: 700;
+  font-size: var(--fs-small);
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.defense-mgr__player {
+  flex: 1;
+  font-size: var(--fs-sub);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.defense-mgr__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Summary section */
+.defense-mgr__summary {
+  border-top: 2px solid var(--color-primary);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-card);
+  flex-shrink: 0;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.defense-mgr__summary-title {
+  font-weight: 700;
+  font-size: var(--fs-small);
+  color: var(--color-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.defense-mgr__summary-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-small);
+  color: var(--text-secondary);
+  padding: 2px 0;
+  gap: var(--space-xs);
+}
+
+.defense-mgr__summary-item span {
+  flex: 1;
+}
+
+/* Section labels inside modals */
+.defense-mgr__section-label {
+  font-size: var(--fs-small);
+  font-weight: 700;
+  color: var(--text-secondary);
+  padding: var(--space-sm) 0 var(--space-xs);
+  border-top: 1px solid var(--bg-input);
+  margin-top: var(--space-xs);
+}
+
+.defense-mgr__section-label:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+
+/* Footer */
+.defense-mgr__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--bg-input);
+  flex-shrink: 0;
+}
+
+/* Extra-small button variant */
+.btn--xs {
+  padding: 2px 8px;
+  font-size: 11px;
+  min-height: 24px;
+  border-radius: var(--radius-sm);
+}
+
+.btn--text {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 0 4px;
+  cursor: pointer;
+}
+.btn--text:hover {
+  color: var(--color-strike);
+}

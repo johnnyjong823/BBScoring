@@ -13,6 +13,7 @@ import { FieldDiagram } from './FieldDiagram.js';
 import { RunnerDiagram } from './RunnerDiagram.js';
 import { Scoreboard } from './Scoreboard.js';
 import { LineupPanel } from './LineupPanel.js';
+import { DefenseManager } from './DefenseManager.js';
 import { GestureHandler } from '../utils/gestures.js';
 
 export class LiveRecord {
@@ -74,6 +75,11 @@ export class LiveRecord {
     this.engine.on('gameEnded', () => this._handleGameEnd());
     this.engine.on('stateChanged', () => this._scheduleRender());
     this.engine.on('atBatDirectRecorded', () => this._updateDisplay());
+    this.engine.on('defenseChanged', () => this._updateDisplay());
+    this.engine.on('needsDefenseConfirmation', ({ side }) => {
+      // Delay slightly so halfInningChanged render finishes first
+      setTimeout(() => this._openDefenseManager({ side, isConfirmation: true }), 300);
+    });
   }
 
   _bindKeyboard() {
@@ -632,12 +638,12 @@ export class LiveRecord {
 
     info.appendChild(left);
 
-    // Change pitcher button
+    // Defense manager button (was change pitcher)
     const changeBtn = createElement('button', {
       className: 'btn btn--icon btn--sm pitcher-header__change',
-      innerHTML: '🔄',
-      title: '更換投手',
-      onClick: () => this._changePitcher()
+      innerHTML: '🛡️',
+      title: '守備調度',
+      onClick: () => this._openDefenseManager({ focusPitcher: true })
     });
     info.appendChild(changeBtn);
 
@@ -1502,8 +1508,7 @@ export class LiveRecord {
     const closeMenu = () => { overlay.remove(); menu.remove(); };
 
     const items = [
-      { icon: '⚾', label: '換投', onClick: () => this._changePitcher() },
-      { icon: '🔄', label: '替補球員', onClick: () => this._substitutePlayer() },
+      { icon: '🛡️', label: '守備調度', onClick: () => this._openDefenseManager() },
       { divider: true },
       { icon: '📖', label: '操作教學', onClick: () => { window.location.hash = '#/tutorial'; } },
       { divider: true },
@@ -1547,127 +1552,26 @@ export class LiveRecord {
     }
   }
 
-  _changePitcher() {
-    const game = this.engine.game;
-    const state = game.currentState;
-    const defendSide = state.halfInning === HALF_INNING.TOP ? 'home' : 'away';
-    const team = game.teams[defendSide];
-    const lineup = game.lineups[defendSide];
-    const currentPitcherId = lineup.pitcher?.playerId;
+  /**
+   * Open the unified Defense Manager panel.
+   * @param {object} [opts]
+   * @param {string} [opts.side] - force a specific side (for confirmation)
+   * @param {boolean} [opts.isConfirmation] - half-inning defense confirmation mode
+   * @param {boolean} [opts.focusPitcher] - highlight pitcher row
+   */
+  _openDefenseManager(opts = {}) {
+    const state = this.engine.game.currentState;
+    const side = opts.side || (state.halfInning === HALF_INNING.TOP ? 'home' : 'away');
 
-    // Get available subs for the fielding side (no specific order slot for pitchers)
-    const available = this._getAvailableSubs(defendSide);
-    // Also include active starters (position change to P is allowed)
-    const activeIds = new Set(lineup.starters.filter(s => s.isActive).map(s => s.playerId));
-    const candidates = team.players.filter(p => {
-      if (p.id === currentPitcherId) return false;
-      return available.includes(p) || activeIds.has(p.id);
+    new DefenseManager({
+      container: this.container,
+      engine: this.engine,
+      side,
+      options: {
+        focusPitcher: opts.focusPitcher || false,
+        isConfirmation: opts.isConfirmation || false
+      },
+      onClose: () => this._updateDisplay()
     });
-
-    if (candidates.length === 0) {
-      showToast('沒有可用的投手人選');
-      return;
-    }
-
-    const modalOverlay = createElement('div', { className: 'modal-overlay active' });
-    const modal = createElement('div', { className: 'modal' });
-    modal.innerHTML = `<div class="modal__title">換投 (${team.name})</div>`;
-
-    const body = createElement('div', { className: 'modal__body scrollable' });
-    candidates.forEach(p => {
-      const isActive = activeIds.has(p.id);
-      const label = isActive
-        ? `#${p.number} ${p.name} (場上)`
-        : `#${p.number} ${p.name}`;
-      const btn = createElement('button', {
-        className: 'btn btn--outline btn--block mb-sm',
-        textContent: label,
-        onClick: () => {
-          this.engine.changePitcher(p.id);
-          modalOverlay.remove();
-          showToast(`投手更換為 #${p.number} ${p.name}`);
-        }
-      });
-      body.appendChild(btn);
-    });
-    modal.appendChild(body);
-    modalOverlay.appendChild(modal);
-
-    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
-    this.container.appendChild(modalOverlay);
-  }
-
-  _substitutePlayer() {
-    const game = this.engine.game;
-    const state = game.currentState;
-    const battingSide = state.halfInning === HALF_INNING.TOP ? 'away' : 'home';
-    const team = game.teams[battingSide];
-    const lineup = game.lineups[battingSide];
-
-    const modalOverlay = createElement('div', { className: 'modal-overlay active' });
-    const modal = createElement('div', { className: 'modal' });
-    modal.innerHTML = `<div class="modal__header"><h3>替補球員 (${team.name})</h3></div>`;
-
-    const body = createElement('div', { className: 'modal__body scrollable' });
-    body.appendChild(createElement('p', { textContent: '選擇要替換的棒次：' }));
-
-    lineup.starters.forEach((s, i) => {
-      const player = team.players.find(p => p.id === s.playerId);
-      if (!player || !s.isActive) return;
-      const btn = createElement('button', {
-        className: 'btn btn--outline btn--block mb-sm',
-        textContent: `${i + 1}棒 #${player.number} ${player.name}`,
-        onClick: () => {
-          modalOverlay.remove();
-          this._showSubReplace(battingSide, i);
-        }
-      });
-      body.appendChild(btn);
-    });
-    modal.appendChild(body);
-    modalOverlay.appendChild(modal);
-
-    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
-    this.container.appendChild(modalOverlay);
-  }
-
-  _showSubReplace(side, orderIndex) {
-    const lineup = this.engine.game.lineups[side];
-    const outPlayerId = lineup.starters[orderIndex].playerId;
-
-    const available = this._getAvailableSubs(side, orderIndex);
-    if (available.length === 0) {
-      showToast('沒有可用的替補球員');
-      return;
-    }
-
-    const modalOverlay = createElement('div', { className: 'modal-overlay active' });
-    const modal = createElement('div', { className: 'modal' });
-    modal.innerHTML = `<div class="modal__header"><h3>選擇替補球員</h3></div>`;
-
-    const body = createElement('div', { className: 'modal__body scrollable' });
-    available.forEach(p => {
-      const btn = createElement('button', {
-        className: 'btn btn--outline btn--block mb-sm',
-        textContent: `#${p.number} ${p.name}`,
-        onClick: () => {
-          this.engine.substitutePlayer({
-            type: 'substitute',
-            playerInId: p.id,
-            playerOutId: outPlayerId,
-            order: orderIndex,
-            side
-          });
-          modalOverlay.remove();
-          showToast(`替補完成`);
-        }
-      });
-      body.appendChild(btn);
-    });
-    modal.appendChild(body);
-    modalOverlay.appendChild(modal);
-
-    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
-    this.container.appendChild(modalOverlay);
   }
 }

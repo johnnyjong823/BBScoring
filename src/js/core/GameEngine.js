@@ -725,6 +725,107 @@ export class GameEngine {
     this.emit('playerSubstituted', { type, playerInId, playerOutId });
   }
 
+  /**
+   * Batch defense changes — handle multiple substitutions and position swaps in one save.
+   * @param {Array} changes - Array of change objects:
+   *   { type: 'substitute', playerInId, playerOutId, position, order, side }
+   *   { type: 'position-swap', playerAId, playerBId, side }
+   *   { type: 'position-change', playerId, newPosition, side }
+   */
+  batchDefenseChange(changes) {
+    if (!this.game || !changes.length) return;
+    const state = this.game.currentState;
+
+    for (const change of changes) {
+      const lineup = this.game.lineups[change.side];
+
+      if (change.type === 'substitute') {
+        // Record substitution
+        lineup.substitutions.push({
+          inning: state.inning,
+          halfInning: state.halfInning,
+          outs: state.outs,
+          type: 'defense-sub',
+          playerIn: change.playerInId,
+          playerOut: change.playerOutId,
+          position: change.position,
+          order: change.order
+        });
+
+        // Update starters
+        const starter = lineup.starters.find(s => s.playerId === change.playerOutId);
+        if (starter) {
+          starter.playerId = change.playerInId;
+          starter.isActive = true;
+          if (change.position) starter.position = change.position;
+        }
+
+        // If replacing the current pitcher
+        if (lineup.pitcher?.playerId === change.playerOutId) {
+          lineup.pitcher.playerId = change.playerInId;
+        }
+      } else if (change.type === 'position-swap') {
+        const starterA = lineup.starters.find(s => s.playerId === change.playerAId);
+        const starterB = lineup.starters.find(s => s.playerId === change.playerBId);
+        if (starterA && starterB) {
+          const tmpPos = starterA.position;
+          starterA.position = starterB.position;
+          starterB.position = tmpPos;
+        }
+        // If one of them is pitcher, update pitcher record
+        if (lineup.pitcher?.playerId === change.playerAId) {
+          lineup.pitcher.playerId = change.playerBId;
+          state.currentPitcherId = change.playerBId;
+        } else if (lineup.pitcher?.playerId === change.playerBId) {
+          lineup.pitcher.playerId = change.playerAId;
+          state.currentPitcherId = change.playerAId;
+        }
+      } else if (change.type === 'position-change') {
+        const starter = lineup.starters.find(s => s.playerId === change.playerId);
+        if (starter) {
+          // If becoming new pitcher
+          if (change.newPosition === 'P') {
+            const oldPitcherId = lineup.pitcher?.playerId;
+            lineup.pitcher = { playerId: change.playerId, isActive: true };
+            state.currentPitcherId = change.playerId;
+            // Record pitcher change substitution
+            if (oldPitcherId && oldPitcherId !== change.playerId) {
+              lineup.substitutions.push({
+                inning: state.inning,
+                halfInning: state.halfInning,
+                outs: state.outs,
+                type: 'change-pitcher',
+                playerIn: change.playerId,
+                playerOut: oldPitcherId,
+                position: 'P'
+              });
+            }
+          }
+          starter.position = change.newPosition;
+        }
+      }
+    }
+
+    this._save();
+    this.emit('defenseChanged', { changes });
+  }
+
+  /**
+   * Check if the batting team had pinch-hit/pinch-run this half inning
+   */
+  hasPendingDefenseConfirmation() {
+    if (!this.game) return false;
+    const state = this.game.currentState;
+    // The team that was batting is now fielding, check their lineup for PH/PR this half
+    const fieldingSide = state.fieldingTeam;
+    const lineup = this.game.lineups[fieldingSide];
+    return lineup.substitutions.some(sub =>
+      sub.inning === state.inning &&
+      sub.halfInning === state.halfInning &&
+      (sub.type === 'pinch-hit' || sub.type === 'pinch-run')
+    );
+  }
+
   // ===================== 比賽控制 =====================
 
   endGame() {
@@ -872,6 +973,15 @@ export class GameEngine {
       return;
     }
 
+    // 偵測進攻方本半局是否有代打/代跑（該方下半局要守備確認）
+    const battingSide = state.battingTeam;
+    const battingLineup = this.game.lineups[battingSide];
+    const hadPinchSub = battingLineup.substitutions.some(sub =>
+      sub.inning === state.inning &&
+      sub.halfInning === state.halfInning &&
+      (sub.type === 'pinch-hit' || sub.type === 'pinch-run')
+    );
+
     // 保存目前隊伍的「下一位打者」索引（第三出局打者已完成打席）
     const lineup = this.game.lineups[state.battingTeam];
     const nextIdx = (state.currentBatterIndex + 1) % lineup.starters.length;
@@ -912,6 +1022,11 @@ export class GameEngine {
       : (state.homeBatterIndex || 0);
     this._startNewAtBat();
     this.emit('halfInningChanged', { inning: state.inning, half: state.halfInning });
+
+    // 如果進攻方有代打/代跑，提醒守備確認
+    if (hadPinchSub) {
+      this.emit('needsDefenseConfirmation', { side: battingSide });
+    }
   }
 
   _getCurrentHalfInning() {
