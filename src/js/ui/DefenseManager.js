@@ -189,6 +189,14 @@ export class DefenseManager {
       }));
     }
 
+    // Current pitcher info bar
+    const pitcherPlayer = this.draft.playerMap[this.draft.pitcherId];
+    if (pitcherPlayer) {
+      const pInfo = createElement('div', { className: 'defense-mgr__pitcher-bar' });
+      pInfo.innerHTML = `🥎 目前投手：<strong>#${pitcherPlayer.number} ${pitcherPlayer.name || ''}</strong>`;
+      panel.appendChild(pInfo);
+    }
+
     // Fielder list
     const list = createElement('div', { className: 'defense-mgr__list' });
     const posOrder = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
@@ -220,6 +228,14 @@ export class DefenseManager {
         className: 'defense-mgr__player',
         textContent: `#${f.player?.number || '?'} ${f.player?.name || ''}`
       });
+
+      // Show batting order
+      if (f.order) {
+        playerSpan.appendChild(createElement('span', {
+          className: 'defense-mgr__order',
+          textContent: `${f.order}棒`
+        }));
+      }
       // Add a small badge for changed rows
       if (changeType === 'new') {
         playerSpan.appendChild(createElement('span', {
