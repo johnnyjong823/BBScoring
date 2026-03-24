@@ -33,6 +33,8 @@ export class DefenseManager {
 
     // Draft state: working copy of positions (not committed yet)
     this.draft = this._buildDraft();
+    // Snapshot of original state for diff highlighting
+    this.originalState = this._snapshotDraft();
     this.pendingChanges = []; // array of change objects for engine
     this.removedPlayers = []; // players subbed OUT in this draft
 
@@ -73,6 +75,23 @@ export class DefenseManager {
       team,
       lineup
     };
+  }
+
+  _snapshotDraft() {
+    return new Map(this.draft.fielders.map(f => [f.order, { playerId: f.playerId, position: f.position }]));
+  }
+
+  /**
+   * Determine visual change type for a fielder row.
+   * @returns {'new'|'moved'|null}
+   */
+  _getRowChangeType(fielder) {
+    if (this.pendingChanges.length === 0) return null;
+    const orig = this.originalState.get(fielder.order);
+    if (!orig) return 'new'; // new slot shouldn't happen, but safe fallback
+    if (orig.playerId !== fielder.playerId) return 'new'; // different person → substituted in
+    if (orig.position !== fielder.position) return 'moved'; // same person, different position
+    return null;
   }
 
   // ═══════════════════════════════════════════════
@@ -159,21 +178,38 @@ export class DefenseManager {
     sorted.forEach(f => {
       const isPitcher = f.playerId === this.draft.pitcherId;
       const isRecentSub = (this.options.recentSubPlayerIds || []).includes(f.playerId);
+      const changeType = this._getRowChangeType(f); // 'new' | 'moved' | null
+
       let rowClass = 'defense-mgr__row';
-      if (isRecentSub) rowClass += ' defense-mgr__row--recent-sub';
+      if (changeType === 'new') rowClass += ' defense-mgr__row--new';
+      else if (changeType === 'moved') rowClass += ' defense-mgr__row--moved';
+      else if (isRecentSub) rowClass += ' defense-mgr__row--recent-sub';
       else if (isPitcher) rowClass += ' defense-mgr__row--pitcher';
 
       const row = createElement('div', { className: rowClass });
 
-      const posLabel = POSITIONS[f.position]?.name || f.position;
       row.appendChild(createElement('span', {
         className: 'defense-mgr__pos',
         textContent: f.position
       }));
-      row.appendChild(createElement('span', {
+
+      const playerSpan = createElement('span', {
         className: 'defense-mgr__player',
         textContent: `#${f.player?.number || '?'} ${f.player?.name || ''}`
-      }));
+      });
+      // Add a small badge for changed rows
+      if (changeType === 'new') {
+        playerSpan.appendChild(createElement('span', {
+          className: 'defense-mgr__badge defense-mgr__badge--new',
+          textContent: 'NEW'
+        }));
+      } else if (changeType === 'moved') {
+        playerSpan.appendChild(createElement('span', {
+          className: 'defense-mgr__badge defense-mgr__badge--moved',
+          textContent: '移'
+        }));
+      }
+      row.appendChild(playerSpan);
 
       const actions = createElement('div', { className: 'defense-mgr__actions' });
 

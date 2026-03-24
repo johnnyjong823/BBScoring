@@ -1424,6 +1424,55 @@
   font-weight: 700;
 }
 
+/* Draft change: new player substituted in (green) */
+.defense-mgr__row--new {
+  background: rgba(46, 204, 113, .15);
+  border-left: 3px solid #27ae60;
+}
+
+.defense-mgr__row--new .defense-mgr__pos {
+  background: #27ae60;
+  color: #fff;
+}
+
+.defense-mgr__row--new .defense-mgr__player {
+  color: #27ae60;
+  font-weight: 700;
+}
+
+/* Draft change: position moved/swapped (blue) */
+.defense-mgr__row--moved {
+  background: rgba(52, 152, 219, .12);
+  border-left: 3px solid var(--color-primary);
+}
+
+.defense-mgr__row--moved .defense-mgr__pos {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* Badge (inline label after player name) */
+.defense-mgr__badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: .5px;
+}
+
+.defense-mgr__badge--new {
+  background: #27ae60;
+  color: #fff;
+}
+
+.defense-mgr__badge--moved {
+  background: var(--color-primary);
+  color: #fff;
+}
+
 .defense-mgr__pos {
   display: inline-flex;
   align-items: center;
