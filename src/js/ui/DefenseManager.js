@@ -38,6 +38,10 @@ export class DefenseManager {
     this.pendingChanges = []; // array of change objects for engine
     this.removedPlayers = []; // players subbed OUT in this draft
 
+    // DH rule tracking
+    this.hadDHOriginal = this.draft.fielders.some(f => f.position === 'DH');
+    this.dhForfeited = false; // set to true when DH is lost
+
     this._render();
   }
 
@@ -92,6 +96,25 @@ export class DefenseManager {
     if (orig.playerId !== fielder.playerId) return 'new'; // different person → substituted in
     if (orig.position !== fielder.position) return 'moved'; // same person, different position
     return null;
+  }
+
+  /**
+   * Check if DH position can be assigned.
+   * - Not allowed if lineup never had DH (pitcher bats)
+   * - Not allowed if DH was forfeited (DH moved to field position)
+   */
+  _isDHAvailable() {
+    if (!this.hadDHOriginal) return false;
+    if (this.dhForfeited) return false;
+    return true;
+  }
+
+  /**
+   * Check if a position is valid to assign given DH rules.
+   */
+  _isPositionAllowed(pos) {
+    if (pos === 'DH' && !this._isDHAvailable()) return false;
+    return true;
   }
 
   // ═══════════════════════════════════════════════
@@ -317,7 +340,9 @@ export class DefenseManager {
 
     // Option 2: Change to an unoccupied position
     const occupiedPositions = new Set(this.draft.fielders.map(f => f.position));
-    const freePositions = POSITION_LIST.filter(p => !occupiedPositions.has(p));
+    const freePositions = POSITION_LIST.filter(p =>
+      !occupiedPositions.has(p) && this._isPositionAllowed(p)
+    );
 
     if (freePositions.length > 0) {
       body.appendChild(createElement('div', {
@@ -427,6 +452,11 @@ export class DefenseManager {
     const oldPosition = fielder.position;
     fielder.position = newPosition;
 
+    // DH forfeit: DH moves to a field position (non-swap), DH slot becomes empty
+    if (oldPosition === 'DH' && newPosition !== 'DH') {
+      this.dhForfeited = true;
+    }
+
     // If becoming pitcher
     if (newPosition === 'P') {
       this.draft.pitcherId = fielder.playerId;
@@ -438,6 +468,7 @@ export class DefenseManager {
       playerName: `#${fielder.player?.number} ${fielder.player?.name || ''}`,
       oldPosition,
       newPosition,
+      dhForfeited: oldPosition === 'DH' && newPosition !== 'DH',
       side: this.side
     });
 
@@ -485,6 +516,7 @@ export class DefenseManager {
     // Full rebuild: reset draft and re-apply remaining changes
     this.draft = this._buildDraft();
     this.removedPlayers = [];
+    this.dhForfeited = false;
 
     const remainingChanges = [...this.pendingChanges];
     this.pendingChanges = [];
@@ -514,6 +546,7 @@ export class DefenseManager {
     this.draft = this._buildDraft();
     this.pendingChanges = [];
     this.removedPlayers = [];
+    this.dhForfeited = false;
     this._render();
   }
 
@@ -529,7 +562,9 @@ export class DefenseManager {
       return `${change.playerAName} (${change.posA}) ↔ ${change.playerBName} (${change.posB})`;
     }
     if (change.type === 'position-change') {
-      return `${change.playerName}: ${change.oldPosition} → ${change.newPosition}`;
+      let desc = `${change.playerName}: ${change.oldPosition} → ${change.newPosition}`;
+      if (change.dhForfeited) desc += ' ⚠️ DH取消';
+      return desc;
     }
     return JSON.stringify(change);
   }
