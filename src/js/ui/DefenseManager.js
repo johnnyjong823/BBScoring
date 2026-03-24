@@ -255,6 +255,7 @@ export class DefenseManager {
         }
       } else {
         // Regular fielders: swap position (excluding DH targets) + bench replace
+        const isPitcher = f.playerId === this.draft.pitcherId;
         actions.appendChild(createElement('button', {
           className: 'btn btn--xs btn--outline',
           textContent: '換位',
@@ -262,7 +263,7 @@ export class DefenseManager {
         }));
         actions.appendChild(createElement('button', {
           className: 'btn btn--xs btn--outline',
-          textContent: '換人',
+          textContent: isPitcher ? '換投' : '換人',
           onClick: () => this._showBenchOptions(f)
         }));
       }
@@ -354,12 +355,23 @@ export class DefenseManager {
     this.draft.fielders
       .filter(f => f.playerId !== fielder.playerId && f.position !== 'DH')
       .forEach(other => {
+        const isPitcherSwap = other.playerId === this.draft.pitcherId || fielder.playerId === this.draft.pitcherId;
+        const label = isPitcherSwap
+          ? `⚠️ ↔ ${other.position} #${other.player?.number || '?'} ${other.player?.name || ''} (將更換投手)`
+          : `↔ ${other.position} #${other.player?.number || '?'} ${other.player?.name || ''}`;
+
         body.appendChild(createElement('button', {
-          className: 'btn btn--outline btn--full mb-sm',
-          textContent: `↔ ${other.position} #${other.player?.number || '?'} ${other.player?.name || ''}`,
+          className: `btn btn--outline btn--full mb-sm${isPitcherSwap ? ' btn--pitcher-warn' : ''}`,
+          textContent: label,
+          style: isPitcherSwap ? 'border-color:var(--color-strike);color:var(--color-strike)' : '',
           onClick: () => {
-            this._addPositionSwap(fielder, other);
-            overlay.remove();
+            if (isPitcherSwap) {
+              // Confirm before swapping with pitcher
+              this._confirmPitcherSwap(fielder, other, overlay);
+            } else {
+              this._addPositionSwap(fielder, other);
+              overlay.remove();
+            }
           }
         }));
       });
@@ -377,12 +389,22 @@ export class DefenseManager {
       }));
 
       freePositions.forEach(pos => {
+        const becomingPitcher = pos === 'P';
+        const label = becomingPitcher
+          ? `⚠️ → ${pos} (${POSITIONS[pos]?.name || pos}) — 將更換投手`
+          : `→ ${pos} (${POSITIONS[pos]?.name || pos})`;
+
         body.appendChild(createElement('button', {
           className: 'btn btn--outline btn--full mb-sm',
-          textContent: `→ ${pos} (${POSITIONS[pos]?.name || pos})`,
+          textContent: label,
+          style: becomingPitcher ? 'border-color:var(--color-strike);color:var(--color-strike)' : '',
           onClick: () => {
-            this._addPositionChange(fielder, pos);
-            overlay.remove();
+            if (becomingPitcher) {
+              this._confirmBecomePitcher(fielder, pos, overlay);
+            } else {
+              this._addPositionChange(fielder, pos);
+              overlay.remove();
+            }
           }
         }));
       });
@@ -395,6 +417,91 @@ export class DefenseManager {
       onClick: () => overlay.remove()
     }));
     modal.appendChild(body);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    this.container.appendChild(overlay);
+  }
+
+  /**
+   * Confirm dialog before swapping positions with the pitcher
+   */
+  _confirmPitcherSwap(fielder, pitcherFielder, parentOverlay) {
+    const currentPitcher = pitcherFielder.playerId === this.draft.pitcherId ? pitcherFielder : fielder;
+    const newPitcher = pitcherFielder.playerId === this.draft.pitcherId ? fielder : pitcherFielder;
+
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `
+      <div class="modal__title">⚠️ 確認更換投手</div>
+      <div class="modal__body" style="text-align:center;padding:var(--space-md)">
+        <p style="margin-bottom:var(--space-sm)">此操作將更換投手：</p>
+        <p style="font-size:1.1rem;margin-bottom:var(--space-sm)">
+          <strong>#${currentPitcher.player?.number} ${currentPitcher.player?.name || ''}</strong> (目前投手)
+          <br>↓ 換位為 ${newPitcher.position}<br>
+          <strong>#${newPitcher.player?.number} ${newPitcher.player?.name || ''}</strong> 將成為新投手
+        </p>
+      </div>`;
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => overlay.remove()
+    }));
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--primary',
+      textContent: '確認換投',
+      onClick: () => {
+        this._addPositionSwap(fielder, pitcherFielder);
+        overlay.remove();
+        parentOverlay.remove();
+      }
+    }));
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    this.container.appendChild(overlay);
+  }
+
+  /**
+   * Confirm dialog before moving a player to pitcher position
+   */
+  _confirmBecomePitcher(fielder, pos, parentOverlay) {
+    const currentPitcherId = this.draft.pitcherId;
+    const currentPitcher = this.draft.fielders.find(f => f.playerId === currentPitcherId);
+    const currentPLabel = currentPitcher
+      ? `#${currentPitcher.player?.number} ${currentPitcher.player?.name || ''}`
+      : '(目前投手)';
+
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `
+      <div class="modal__title">⚠️ 確認更換投手</div>
+      <div class="modal__body" style="text-align:center;padding:var(--space-md)">
+        <p style="margin-bottom:var(--space-sm)">此操作將更換投手：</p>
+        <p style="font-size:1.1rem">
+          <strong>#${fielder.player?.number} ${fielder.player?.name || ''}</strong>
+          (${fielder.position} → P) 將成為新投手
+        </p>
+        <p style="color:var(--text-secondary);margin-top:var(--space-sm)">
+          原投手 ${currentPLabel} 將不再擔任投手
+        </p>
+      </div>`;
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => overlay.remove()
+    }));
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--primary',
+      textContent: '確認換投',
+      onClick: () => {
+        this._addPositionChange(fielder, pos);
+        overlay.remove();
+        parentOverlay.remove();
+      }
+    }));
     modal.appendChild(actions);
     overlay.appendChild(modal);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
@@ -414,8 +521,15 @@ export class DefenseManager {
 
     const overlay = createElement('div', { className: 'modal-overlay active' });
     const modal = createElement('div', { className: 'modal' });
-    modal.innerHTML = `<div class="modal__title">替換 #${fielder.player?.number || '?'} ${fielder.player?.name || ''}</div>
-      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">選擇板凳球員上場守 ${fielder.position}</p>`;
+    const isPitcher = fielder.playerId === this.draft.pitcherId;
+    const titleText = isPitcher
+      ? `換投 — 替換 #${fielder.player?.number || '?'} ${fielder.player?.name || ''}`
+      : `替換 #${fielder.player?.number || '?'} ${fielder.player?.name || ''}`;
+    const subtitle = isPitcher
+      ? '選擇新投手上場'
+      : `選擇板凳球員上場守 ${fielder.position}`;
+    modal.innerHTML = `<div class="modal__title">${titleText}</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">${subtitle}</p>`;
 
     const body = createElement('div', { className: 'modal__body', style: 'max-height:50vh;overflow-y:auto' });
 

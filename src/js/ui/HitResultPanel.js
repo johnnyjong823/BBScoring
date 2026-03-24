@@ -332,23 +332,25 @@ export class HitResultPanel {
 
       OUT_OPTIONS.forEach(o => {
         let ok = o.compatible.includes(d.hitType);
-        // Filter DP/TP/SF/SAC/IF based on runner count and out count
         const runnerCount = this._runnerCount;
+
+        // Filter based on game state (outs, runners)
         if (o.val === 'DP') { if (runnerCount < 1 || this.outs >= 2) ok = false; }
         if (o.val === 'TP') { if (runnerCount < 2 || this.outs >= 1) ok = false; }
-        if (o.val === 'SF') { if (!this.runners.third) ok = false; }
-        if (o.val === 'SAC') { if (runnerCount < 1) ok = false; }
-        // IF (infield fly): requires runners on 1st+2nd (or loaded), <2 outs
+        if (o.val === 'SF') { if (!this.runners.third || this.outs >= 2) ok = false; }
+        if (o.val === 'SAC') { if (runnerCount < 1 || this.outs >= 2) ok = false; }
         if (o.val === 'IF') {
           const has1and2 = !!this.runners.first && !!this.runners.second;
           if (!has1and2 || this.outs >= 2) ok = false;
         }
 
+        // Hide invalid options entirely instead of showing disabled
+        if (!ok) return;
+
         grid.appendChild(createElement('button', {
-          className: `btn btn--sm ${ok ? 'btn--out' : 'btn--outline hit-wizard__disabled'}`,
+          className: 'btn btn--sm btn--out',
           textContent: o.label,
-          disabled: !ok,
-          onClick: () => { if (!ok) return; Vibration.tap(); d.resultType = o.val; this.render(); }
+          onClick: () => { Vibration.tap(); d.resultType = o.val; this.render(); }
         }));
       });
       frag.appendChild(grid);
