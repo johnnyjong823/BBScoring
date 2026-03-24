@@ -803,6 +803,42 @@ export class GameEngine {
           }
           starter.position = change.newPosition;
         }
+      } else if (change.type === 'forfeit-dh') {
+        // DH is forfeited: remove DH player from lineup and put pitcher into batting order
+        const dhStarter = lineup.starters.find(s => s.playerId === change.dhPlayerId);
+        if (dhStarter) {
+          // Mark the DH player as inactive
+          dhStarter.isActive = false;
+
+          // The pitcher now takes this batting order slot
+          // Find existing pitcher starter (if pitcher was in the lineup as P only)
+          const pitcherId = lineup.pitcher?.playerId;
+          const pitcherStarter = lineup.starters.find(s => s.playerId === pitcherId && s.isActive);
+          if (pitcherStarter) {
+            // Pitcher already in lineup as fielder — update their order to DH's slot
+            pitcherStarter.order = dhStarter.order;
+          } else {
+            // Pitcher not in batting order yet — add them at DH's slot
+            lineup.starters.push({
+              order: dhStarter.order || change.dhOrder,
+              playerId: pitcherId,
+              position: 'P',
+              isActive: true
+            });
+          }
+
+          // Record the DH forfeit as a substitution entry
+          lineup.substitutions.push({
+            inning: state.inning,
+            halfInning: state.halfInning,
+            outs: state.outs,
+            type: 'forfeit-dh',
+            playerIn: pitcherId,
+            playerOut: change.dhPlayerId,
+            position: 'DH→P',
+            order: dhStarter.order || change.dhOrder
+          });
+        }
       }
     }
 

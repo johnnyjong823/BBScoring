@@ -382,10 +382,18 @@ export class LiveRecord {
     const side = state.halfInning === HALF_INNING.TOP ? 'away' : 'home';
     const lineup = game.lineups[side];
     const orderIndex = state.currentBatterIndex;
-    const outPlayerId = lineup.starters[orderIndex].playerId;
+    const currentStarter = lineup.starters[orderIndex];
+    const outPlayerId = currentStarter.playerId;
+    const batterPosition = currentStarter.position;
 
     const available = this._getAvailableSubs(side, orderIndex);
-    if (available.length === 0) {
+
+    // Check if current batter is DH — offer "取消DH (投手代打)" option
+    const isDHBatter = batterPosition === 'DH';
+    // Also determine the fielding side's pitcher if this batter is DH
+    const fieldingSide = side === 'away' ? 'home' : 'away';
+
+    if (available.length === 0 && !isDHBatter) {
       showToast('沒有可用的替補球員');
       return;
     }
@@ -396,7 +404,48 @@ export class LiveRecord {
       <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">選擇代打球員替換目前打者</p>`;
 
     const body = createElement('div', { className: 'modal__body', style: 'max-height:50vh;overflow-y:auto' });
-    available.forEach(p => {
+
+    // Special "取消DH" option when batter is DH
+    if (isDHBatter) {
+      const pitcherId = lineup.pitcher?.playerId;
+      const pitcherPlayer = pitcherId ? game.teams[side].players.find(p => p.id === pitcherId) : null;
+      if (pitcherPlayer) {
+        body.appendChild(createElement('div', {
+          className: 'defense-mgr__section-label',
+          textContent: '⚠️ 取消DH制度',
+          style: 'color:var(--color-strike);font-weight:bold;margin-bottom:var(--space-sm)'
+        }));
+        body.appendChild(createElement('button', {
+          className: 'btn btn--outline btn--full mb-sm',
+          style: 'border-color:var(--color-strike);color:var(--color-strike)',
+          textContent: `投手代打：#${pitcherPlayer.number} ${pitcherPlayer.name || ''} (取消DH)`,
+          onClick: () => {
+            // Forfeit DH: pitcher enters batting lineup at DH's slot
+            this.engine.batchDefenseChange([{
+              type: 'forfeit-dh',
+              dhPlayerId: outPlayerId,
+              dhOrder: orderIndex,
+              side
+            }]);
+            modalOverlay.remove();
+            showToast(`取消DH：投手 #${pitcherPlayer.number} ${pitcherPlayer.name || ''} 進入打線`);
+          }
+        }));
+
+        if (available.length > 0) {
+          body.appendChild(createElement('div', {
+            className: 'defense-mgr__section-label',
+            textContent: '板凳球員代打',
+            style: 'margin-top:var(--space-md)'
+          }));
+        }
+      }
+    }
+
+    // Filter pitcher from available subs when batter is NOT DH
+    const filteredAvailable = isDHBatter ? available : available.filter(p => p.id !== lineup.pitcher?.playerId);
+
+    filteredAvailable.forEach(p => {
       body.appendChild(createElement('button', {
         className: 'btn btn--outline btn--full mb-sm',
         textContent: `#${p.number}  ${p.name || `球員${p.number}`}`,

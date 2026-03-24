@@ -236,19 +236,36 @@ export class DefenseManager {
 
       const actions = createElement('div', { className: 'defense-mgr__actions' });
 
-      // Swap position button
-      actions.appendChild(createElement('button', {
-        className: 'btn btn--xs btn--outline',
-        textContent: '換位',
-        onClick: () => this._showPositionOptions(f)
-      }));
+      const isDH = f.position === 'DH';
 
-      // Replace with bench button
-      actions.appendChild(createElement('button', {
-        className: 'btn btn--xs btn--outline',
-        textContent: '換人',
-        onClick: () => this._showBenchOptions(f)
-      }));
+      if (isDH) {
+        // DH can only: be replaced by bench, or forfeit DH
+        actions.appendChild(createElement('button', {
+          className: 'btn btn--xs btn--outline',
+          textContent: '換人',
+          onClick: () => this._showBenchOptions(f)
+        }));
+        if (!this.dhForfeited) {
+          actions.appendChild(createElement('button', {
+            className: 'btn btn--xs btn--outline',
+            style: 'color:var(--color-strike);border-color:var(--color-strike)',
+            textContent: '取消DH',
+            onClick: () => this._forfeitDH(f)
+          }));
+        }
+      } else {
+        // Regular fielders: swap position (excluding DH targets) + bench replace
+        actions.appendChild(createElement('button', {
+          className: 'btn btn--xs btn--outline',
+          textContent: '換位',
+          onClick: () => this._showPositionOptions(f)
+        }));
+        actions.appendChild(createElement('button', {
+          className: 'btn btn--xs btn--outline',
+          textContent: '換人',
+          onClick: () => this._showBenchOptions(f)
+        }));
+      }
 
       row.appendChild(actions);
       list.appendChild(row);
@@ -280,6 +297,15 @@ export class DefenseManager {
 
     // Footer buttons
     const footer = createElement('div', { className: 'defense-mgr__footer' });
+
+    // Double Switch button (only for non-DH lineups)
+    if (!this.hadDHOriginal) {
+      footer.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--sm',
+        textContent: '雙重換人',
+        onClick: () => this._showDoubleSwitch()
+      }));
+    }
 
     if (this.pendingChanges.length > 0) {
       footer.appendChild(createElement('button', {
@@ -319,14 +345,14 @@ export class DefenseManager {
 
     const body = createElement('div', { className: 'modal__body', style: 'max-height:50vh;overflow-y:auto' });
 
-    // Option 1: Swap with another fielder
+    // Option 1: Swap with another fielder (exclude DH — DH cannot swap positions)
     body.appendChild(createElement('div', {
       className: 'defense-mgr__section-label',
       textContent: '與場上球員互換位置'
     }));
 
     this.draft.fielders
-      .filter(f => f.playerId !== fielder.playerId)
+      .filter(f => f.playerId !== fielder.playerId && f.position !== 'DH')
       .forEach(other => {
         body.appendChild(createElement('button', {
           className: 'btn btn--outline btn--full mb-sm',
@@ -415,6 +441,268 @@ export class DefenseManager {
     overlay.appendChild(modal);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     this.container.appendChild(overlay);
+  }
+
+  /**
+   * Forfeit DH: remove DH position, pitcher must enter batting lineup at the DH's slot.
+   * The DH player is removed, and the pitcher takes their batting order.
+   */
+  _forfeitDH(dhFielder) {
+    const idx = this.draft.fielders.indexOf(dhFielder);
+    if (idx < 0) return;
+
+    const dhOrder = dhFielder.order;
+    const dhPlayerId = dhFielder.playerId;
+
+    // Remove DH from draft fielders
+    this.draft.fielders.splice(idx, 1);
+    this.removedPlayers.push(dhPlayerId);
+    this.dhForfeited = true;
+
+    // Add pitcher to batting lineup at the DH's batting order slot
+    const pitcherId = this.draft.pitcherId;
+    const pitcherPlayer = this.draft.playerMap[pitcherId];
+    if (pitcherId && pitcherPlayer) {
+      // Check if pitcher is already in fielders (shouldn't be in DH lineup, but safety check)
+      const existingPitcher = this.draft.fielders.find(f => f.playerId === pitcherId);
+      if (!existingPitcher) {
+        this.draft.fielders.push({
+          playerId: pitcherId,
+          player: pitcherPlayer,
+          position: 'P',
+          order: dhOrder,
+          isOriginal: false
+        });
+      }
+    }
+
+    this.pendingChanges.push({
+      type: 'forfeit-dh',
+      dhPlayerId: dhPlayerId,
+      dhPlayerName: `#${dhFielder.player?.number} ${dhFielder.player?.name || ''}`,
+      dhOrder: dhOrder,
+      side: this.side
+    });
+
+    this._render();
+  }
+
+  // ═══════════════════════════════════════════════
+  // Double Switch (non-DH lineups only)
+  // ═══════════════════════════════════════════════
+
+  _showDoubleSwitch() {
+    // Double Switch: simultaneously replace two players and swap their batting orders
+    // Typically used to keep the new pitcher from batting soon
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `<div class="modal__title">雙重換人 (Double Switch)</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">
+        同時換下兩名球員，新球員的守位與棒次互換
+      </p>`;
+
+    const body = createElement('div', { className: 'modal__body', style: 'max-height:55vh;overflow-y:auto' });
+
+    // Step 1: Select two fielders to remove
+    body.appendChild(createElement('div', {
+      className: 'defense-mgr__section-label',
+      textContent: '選擇要換下的第一位球員'
+    }));
+
+    this.draft.fielders.forEach(f => {
+      body.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--full mb-sm',
+        textContent: `${f.position} #${f.player?.number || '?'} ${f.player?.name || ''} (${f.order}棒)`,
+        onClick: () => {
+          overlay.remove();
+          this._doubleSwitchStep2(f);
+        }
+      }));
+    });
+
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => overlay.remove()
+    }));
+    modal.appendChild(body);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    this.container.appendChild(overlay);
+  }
+
+  _doubleSwitchStep2(firstFielder) {
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `<div class="modal__title">雙重換人 — 選第二位</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">
+        已選：${firstFielder.position} #${firstFielder.player?.number} ${firstFielder.player?.name || ''}
+      </p>`;
+
+    const body = createElement('div', { className: 'modal__body', style: 'max-height:55vh;overflow-y:auto' });
+
+    this.draft.fielders
+      .filter(f => f.playerId !== firstFielder.playerId)
+      .forEach(f => {
+        body.appendChild(createElement('button', {
+          className: 'btn btn--outline btn--full mb-sm',
+          textContent: `${f.position} #${f.player?.number || '?'} ${f.player?.name || ''} (${f.order}棒)`,
+          onClick: () => {
+            overlay.remove();
+            this._doubleSwitchSelectSubs(firstFielder, f);
+          }
+        }));
+      });
+
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => overlay.remove()
+    }));
+    modal.appendChild(body);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    this.container.appendChild(overlay);
+  }
+
+  _doubleSwitchSelectSubs(fieldA, fieldB) {
+    const bench = this._getAvailableBench();
+    if (bench.length < 2) {
+      showToast('板凳球員不足，無法雙重換人');
+      return;
+    }
+
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `<div class="modal__title">雙重換人 — 選替補</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">
+        替補1 → 守 ${fieldA.position}（${fieldB.order}棒）<br>
+        替補2 → 守 ${fieldB.position}（${fieldA.order}棒）
+      </p>`;
+
+    const body = createElement('div', { className: 'modal__body', style: 'max-height:50vh;overflow-y:auto' });
+
+    body.appendChild(createElement('div', {
+      className: 'defense-mgr__section-label',
+      textContent: `選擇替補1：守 ${fieldA.position}（接 ${fieldB.order}棒）`
+    }));
+
+    bench.forEach(p => {
+      body.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--full mb-sm',
+        textContent: `#${p.number} ${p.name || `球員${p.number}`}`,
+        onClick: () => {
+          overlay.remove();
+          this._doubleSwitchFinalPick(fieldA, fieldB, p);
+        }
+      }));
+    });
+
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => overlay.remove()
+    }));
+    modal.appendChild(body);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    this.container.appendChild(overlay);
+  }
+
+  _doubleSwitchFinalPick(fieldA, fieldB, sub1) {
+    const bench = this._getAvailableBench().filter(p => p.id !== sub1.id);
+    if (bench.length === 0) {
+      showToast('板凳球員不足');
+      return;
+    }
+
+    const overlay = createElement('div', { className: 'modal-overlay active' });
+    const modal = createElement('div', { className: 'modal' });
+    modal.innerHTML = `<div class="modal__title">雙重換人 — 選替補2</div>
+      <p style="color:var(--text-secondary);margin-bottom:var(--space-md)">
+        替補1：#${sub1.number} ${sub1.name || ''} → ${fieldA.position}<br>
+        選擇替補2 → 守 ${fieldB.position}（接 ${fieldA.order}棒）
+      </p>`;
+
+    const body = createElement('div', { className: 'modal__body', style: 'max-height:50vh;overflow-y:auto' });
+
+    bench.forEach(p => {
+      body.appendChild(createElement('button', {
+        className: 'btn btn--outline btn--full mb-sm',
+        textContent: `#${p.number} ${p.name || `球員${p.number}`}`,
+        onClick: () => {
+          overlay.remove();
+          // Execute: sub1 takes fieldA's position at fieldB's batting order
+          //          sub2 takes fieldB's position at fieldA's batting order
+          this._executeDoubleSwitch(fieldA, fieldB, sub1, p);
+        }
+      }));
+    });
+
+    const actions = createElement('div', { className: 'modal__actions' });
+    actions.appendChild(createElement('button', {
+      className: 'btn btn--outline',
+      textContent: '取消',
+      onClick: () => overlay.remove()
+    }));
+    modal.appendChild(body);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    this.container.appendChild(overlay);
+  }
+
+  _executeDoubleSwitch(fieldA, fieldB, sub1, sub2) {
+    // sub1 replaces fieldA, takes fieldA's position but fieldB's batting order
+    // sub2 replaces fieldB, takes fieldB's position but fieldA's batting order
+
+    // Step 1: sub both out
+    this.removedPlayers.push(fieldA.playerId, fieldB.playerId);
+
+    const idxA = this.draft.fielders.indexOf(fieldA);
+    const idxB = this.draft.fielders.indexOf(fieldB);
+
+    // sub1 → fieldA position, fieldB order
+    this.draft.fielders[idxA] = {
+      playerId: sub1.id,
+      player: sub1,
+      position: fieldA.position,
+      order: fieldB.order,
+      isOriginal: false
+    };
+
+    // sub2 → fieldB position, fieldA order
+    this.draft.fielders[idxB] = {
+      playerId: sub2.id,
+      player: sub2,
+      position: fieldB.position,
+      order: fieldA.order,
+      isOriginal: false
+    };
+
+    // Update pitcher if either was pitcher
+    if (this.draft.pitcherId === fieldA.playerId) {
+      this.draft.pitcherId = sub1.id;
+    } else if (this.draft.pitcherId === fieldB.playerId) {
+      this.draft.pitcherId = sub2.id;
+    }
+
+    this.pendingChanges.push({
+      type: 'double-switch',
+      outA: { playerId: fieldA.playerId, name: `#${fieldA.player?.number} ${fieldA.player?.name || ''}`, position: fieldA.position, order: fieldA.order },
+      outB: { playerId: fieldB.playerId, name: `#${fieldB.player?.number} ${fieldB.player?.name || ''}`, position: fieldB.position, order: fieldB.order },
+      inA: { playerId: sub1.id, name: `#${sub1.number} ${sub1.name || ''}`, position: fieldA.position, order: fieldB.order },
+      inB: { playerId: sub2.id, name: `#${sub2.number} ${sub2.name || ''}`, position: fieldB.position, order: fieldA.order },
+      side: this.side
+    });
+
+    this._render();
   }
 
   // ═══════════════════════════════════════════════
@@ -533,6 +821,15 @@ export class DefenseManager {
         const f = this.draft.fielders.find(f => f.playerId === change.playerOutId);
         const p = this.draft.playerMap[change.playerInId] || this.draft.team.players.find(pl => pl.id === change.playerInId);
         if (f && p) this._addSubstitution(f, p);
+      } else if (change.type === 'forfeit-dh') {
+        const dhF = this.draft.fielders.find(f => f.playerId === change.dhPlayerId);
+        if (dhF) this._forfeitDH(dhF);
+      } else if (change.type === 'double-switch') {
+        const fA = this.draft.fielders.find(f => f.playerId === change.outA.playerId);
+        const fB = this.draft.fielders.find(f => f.playerId === change.outB.playerId);
+        const s1 = this.draft.playerMap[change.inA.playerId] || this.draft.team.players.find(pl => pl.id === change.inA.playerId);
+        const s2 = this.draft.playerMap[change.inB.playerId] || this.draft.team.players.find(pl => pl.id === change.inB.playerId);
+        if (fA && fB && s1 && s2) this._executeDoubleSwitch(fA, fB, s1, s2);
       }
     }
 
@@ -566,6 +863,12 @@ export class DefenseManager {
       if (change.dhForfeited) desc += ' ⚠️ DH取消';
       return desc;
     }
+    if (change.type === 'forfeit-dh') {
+      return `⚠️ 取消DH制度 — ${change.dhPlayerName} 退出打線，投手進入打線`;
+    }
+    if (change.type === 'double-switch') {
+      return `雙重換人：${change.outA.name}(${change.outA.order}棒) + ${change.outB.name}(${change.outB.order}棒) 退場 → ${change.inA.name}(${change.inA.order}棒 ${change.inA.position}) + ${change.inB.name}(${change.inB.order}棒 ${change.inB.position})`;
+    }
     return JSON.stringify(change);
   }
 
@@ -576,35 +879,61 @@ export class DefenseManager {
   _confirm() {
     if (this.pendingChanges.length > 0) {
       // Build engine-format changes (strip display-only fields)
-      const engineChanges = this.pendingChanges.map(c => {
+      const engineChanges = [];
+      for (const c of this.pendingChanges) {
         if (c.type === 'substitute') {
-          return {
+          engineChanges.push({
             type: 'substitute',
             playerInId: c.playerInId,
             playerOutId: c.playerOutId,
             position: c.position,
             order: c.order,
             side: c.side
-          };
-        }
-        if (c.type === 'position-swap') {
-          return {
+          });
+        } else if (c.type === 'position-swap') {
+          engineChanges.push({
             type: 'position-swap',
             playerAId: c.playerAId,
             playerBId: c.playerBId,
             side: c.side
-          };
-        }
-        if (c.type === 'position-change') {
-          return {
+          });
+        } else if (c.type === 'position-change') {
+          engineChanges.push({
             type: 'position-change',
             playerId: c.playerId,
             newPosition: c.newPosition,
             side: c.side
-          };
+          });
+        } else if (c.type === 'forfeit-dh') {
+          // DH forfeit: remove DH, pitcher enters batting lineup
+          engineChanges.push({
+            type: 'forfeit-dh',
+            dhPlayerId: c.dhPlayerId,
+            dhOrder: c.dhOrder,
+            side: c.side
+          });
+        } else if (c.type === 'double-switch') {
+          // Expand to two substitute + batting order swap
+          engineChanges.push({
+            type: 'substitute',
+            playerInId: c.inA.playerId,
+            playerOutId: c.outA.playerId,
+            position: c.inA.position,
+            order: c.inA.order, // swapped order
+            side: c.side
+          });
+          engineChanges.push({
+            type: 'substitute',
+            playerInId: c.inB.playerId,
+            playerOutId: c.outB.playerId,
+            position: c.inB.position,
+            order: c.inB.order, // swapped order
+            side: c.side
+          });
+        } else {
+          engineChanges.push(c);
         }
-        return c;
-      });
+      }
 
       this.engine.batchDefenseChange(engineChanges);
       showToast(`守備調度完成（${this.pendingChanges.length} 項異動）`);
