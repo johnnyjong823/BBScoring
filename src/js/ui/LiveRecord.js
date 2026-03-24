@@ -76,9 +76,8 @@ export class LiveRecord {
     this.engine.on('stateChanged', () => this._scheduleRender());
     this.engine.on('atBatDirectRecorded', () => this._updateDisplay());
     this.engine.on('defenseChanged', () => this._updateDisplay());
-    this.engine.on('needsDefenseConfirmation', ({ side }) => {
-      // Delay slightly so halfInningChanged render finishes first
-      setTimeout(() => this._openDefenseManager({ side, isConfirmation: true }), 300);
+    this.engine.on('needsDefenseConfirmation', ({ side, recentSubPlayerIds }) => {
+      setTimeout(() => this._openDefenseManager({ side, isConfirmation: true, recentSubPlayerIds }), 300);
     });
   }
 
@@ -1569,7 +1568,8 @@ export class LiveRecord {
       side,
       options: {
         focusPitcher: opts.focusPitcher || false,
-        isConfirmation: opts.isConfirmation || false
+        isConfirmation: opts.isConfirmation || false,
+        recentSubPlayerIds: opts.recentSubPlayerIds || []
       },
       onClose: () => this._updateDisplay()
     });

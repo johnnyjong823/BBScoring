@@ -138,9 +138,12 @@ export class DefenseManager {
     panel.appendChild(header);
 
     if (this.options.isConfirmation) {
+      const hintText = (this.options.recentSubPlayerIds || []).length > 0
+        ? '本半局有代打/代跑（橘色標示），請確認守備位置'
+        : '本半局有代打/代跑，請確認守備位置';
       panel.appendChild(createElement('div', {
         className: 'defense-mgr__hint',
-        textContent: '本半局有代打/代跑，請確認守備位置'
+        textContent: hintText
       }));
     }
 
@@ -154,9 +157,13 @@ export class DefenseManager {
     });
 
     sorted.forEach(f => {
-      const row = createElement('div', {
-        className: `defense-mgr__row${f.playerId === this.draft.pitcherId ? ' defense-mgr__row--pitcher' : ''}`
-      });
+      const isPitcher = f.playerId === this.draft.pitcherId;
+      const isRecentSub = (this.options.recentSubPlayerIds || []).includes(f.playerId);
+      let rowClass = 'defense-mgr__row';
+      if (isRecentSub) rowClass += ' defense-mgr__row--recent-sub';
+      else if (isPitcher) rowClass += ' defense-mgr__row--pitcher';
+
+      const row = createElement('div', { className: rowClass });
 
       const posLabel = POSITIONS[f.position]?.name || f.position;
       row.appendChild(createElement('span', {

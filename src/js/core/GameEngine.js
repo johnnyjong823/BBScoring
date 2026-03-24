@@ -976,11 +976,12 @@ export class GameEngine {
     // 偵測進攻方本半局是否有代打/代跑（該方下半局要守備確認）
     const battingSide = state.battingTeam;
     const battingLineup = this.game.lineups[battingSide];
-    const hadPinchSub = battingLineup.substitutions.some(sub =>
+    const pinchSubs = battingLineup.substitutions.filter(sub =>
       sub.inning === state.inning &&
       sub.halfInning === state.halfInning &&
       (sub.type === 'pinch-hit' || sub.type === 'pinch-run')
     );
+    const hadPinchSub = pinchSubs.length > 0;
 
     // 保存目前隊伍的「下一位打者」索引（第三出局打者已完成打席）
     const lineup = this.game.lineups[state.battingTeam];
@@ -1025,7 +1026,8 @@ export class GameEngine {
 
     // 如果進攻方有代打/代跑，提醒守備確認
     if (hadPinchSub) {
-      this.emit('needsDefenseConfirmation', { side: battingSide });
+      const recentSubPlayerIds = pinchSubs.map(sub => sub.playerIn);
+      this.emit('needsDefenseConfirmation', { side: battingSide, recentSubPlayerIds });
     }
   }
 

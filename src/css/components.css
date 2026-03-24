@@ -1414,6 +1414,16 @@
   background: rgba(var(--color-primary-rgb, 52,152,219), .08);
 }
 
+.defense-mgr__row--recent-sub {
+  background: rgba(255, 165, 0, .15);
+  border-left: 3px solid #f39c12;
+}
+
+.defense-mgr__row--recent-sub .defense-mgr__player {
+  color: #e67e22;
+  font-weight: 700;
+}
+
 .defense-mgr__pos {
   display: inline-flex;
   align-items: center;
