@@ -644,6 +644,11 @@ export class GameEngine {
       this.game.innings = deepClone(action.before.innings);
     }
 
+    // 恢復陣容（守備調度的 undo 需要）
+    if (action.before.lineups) {
+      this.game.lineups = deepClone(action.before.lineups);
+    }
+
     this._save();
     this.emit('undoPerformed', action);
     return true;
@@ -664,6 +669,11 @@ export class GameEngine {
       this.game.innings = deepClone(action.after.innings);
     }
 
+    // 恢復陣容（守備調度的 redo 需要）
+    if (action.after.lineups) {
+      this.game.lineups = deepClone(action.after.lineups);
+    }
+
     this._save();
     this.emit('redoPerformed', action);
     return true;
@@ -680,6 +690,10 @@ export class GameEngine {
     const lineup = this.game.lineups[side];
     const oldPitcherId = lineup.pitcher?.playerId;
 
+    // Save before-state for undo
+    const beforeState = deepClone(this.game.currentState);
+    const beforeLineups = deepClone(this.game.lineups);
+
     // Record the substitution for reentry tracking
     if (oldPitcherId && oldPitcherId !== newPitcherId) {
       lineup.substitutions.push({
@@ -695,12 +709,41 @@ export class GameEngine {
 
     lineup.pitcher = { playerId: newPitcherId, isActive: true };
     this.game.currentState.currentPitcherId = newPitcherId;
+
+    // Push undo action with lineup snapshot
+    const action = {
+      id: `action_${Date.now()}`,
+      type: 'change-pitcher',
+      timestamp: getTimestamp(),
+      description: 'change pitcher',
+      before: {
+        currentState: beforeState,
+        lineups: beforeLineups,
+        affectedAtBat: deepClone(this.recorder.getCurrentAtBat()),
+        innings: deepClone(this.game.innings)
+      },
+      after: {
+        currentState: deepClone(this.game.currentState),
+        lineups: deepClone(this.game.lineups),
+        affectedAtBat: deepClone(this.recorder.getCurrentAtBat()),
+        innings: deepClone(this.game.innings)
+      }
+    };
+    this.undoMgr.push(action);
+    this.game.history = this.undoMgr.toJSON().stack;
+    this.game.historyIndex = this.undoMgr.toJSON().index;
+
     this._save();
     this.emit('pitcherChanged', { side, pitcherId: newPitcherId });
   }
 
   substitutePlayer({ type, playerInId, playerOutId, position, order, side }) {
     if (!this.game) return;
+
+    // Save before-state for undo (includes lineups)
+    const beforeState = deepClone(this.game.currentState);
+    const beforeLineups = deepClone(this.game.lineups);
+
     const lineup = this.game.lineups[side];
     lineup.substitutions.push({
       inning: this.game.currentState.inning,
@@ -721,6 +764,29 @@ export class GameEngine {
       if (position) starter.position = position;
     }
 
+    // Push undo action with lineup snapshot
+    const action = {
+      id: `action_${Date.now()}`,
+      type: 'substitute-player',
+      timestamp: getTimestamp(),
+      description: type,
+      before: {
+        currentState: beforeState,
+        lineups: beforeLineups,
+        affectedAtBat: deepClone(this.recorder.getCurrentAtBat()),
+        innings: deepClone(this.game.innings)
+      },
+      after: {
+        currentState: deepClone(this.game.currentState),
+        lineups: deepClone(this.game.lineups),
+        affectedAtBat: deepClone(this.recorder.getCurrentAtBat()),
+        innings: deepClone(this.game.innings)
+      }
+    };
+    this.undoMgr.push(action);
+    this.game.history = this.undoMgr.toJSON().stack;
+    this.game.historyIndex = this.undoMgr.toJSON().index;
+
     this._save();
     this.emit('playerSubstituted', { type, playerInId, playerOutId });
   }
@@ -735,6 +801,10 @@ export class GameEngine {
   batchDefenseChange(changes) {
     if (!this.game || !changes.length) return;
     const state = this.game.currentState;
+
+    // Save before-state for undo (include lineups since defense changes modify them)
+    const beforeState = deepClone(state);
+    const beforeLineups = deepClone(this.game.lineups);
 
     for (const change of changes) {
       const lineup = this.game.lineups[change.side];
@@ -763,6 +833,10 @@ export class GameEngine {
         // If replacing the current pitcher
         if (lineup.pitcher?.playerId === change.playerOutId) {
           lineup.pitcher.playerId = change.playerInId;
+          // Must also update currentPitcherId for the fielding side
+          if (change.side === state.fieldingTeam) {
+            state.currentPitcherId = change.playerInId;
+          }
         }
       } else if (change.type === 'position-swap') {
         const starterA = lineup.starters.find(s => s.playerId === change.playerAId);
@@ -841,6 +915,29 @@ export class GameEngine {
         }
       }
     }
+
+    // Push undo action (includes lineup snapshot)
+    const action = {
+      id: `action_${Date.now()}`,
+      type: 'defense-change',
+      timestamp: getTimestamp(),
+      description: 'defense change',
+      before: {
+        currentState: beforeState,
+        lineups: beforeLineups,
+        affectedAtBat: deepClone(this.recorder.getCurrentAtBat()),
+        innings: deepClone(this.game.innings)
+      },
+      after: {
+        currentState: deepClone(this.game.currentState),
+        lineups: deepClone(this.game.lineups),
+        affectedAtBat: deepClone(this.recorder.getCurrentAtBat()),
+        innings: deepClone(this.game.innings)
+      }
+    };
+    this.undoMgr.push(action);
+    this.game.history = this.undoMgr.toJSON().stack;
+    this.game.historyIndex = this.undoMgr.toJSON().index;
 
     this._save();
     this.emit('defenseChanged', { changes });

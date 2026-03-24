@@ -76,6 +76,8 @@ export class LiveRecord {
     this.engine.on('stateChanged', () => this._scheduleRender());
     this.engine.on('atBatDirectRecorded', () => this._updateDisplay());
     this.engine.on('defenseChanged', () => this._updateDisplay());
+    this.engine.on('pitcherChanged', () => this._updateDisplay());
+    this.engine.on('playerSubstituted', () => this._updateDisplay());
     this.engine.on('needsDefenseConfirmation', ({ side, recentSubPlayerIds }) => {
       setTimeout(() => this._openDefenseManager({ side, isConfirmation: true, recentSubPlayerIds }), 300);
     });
